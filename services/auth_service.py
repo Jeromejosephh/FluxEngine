@@ -84,38 +84,57 @@ class AuthService:
     def create_user(self, user_data: UserCreate) -> User:
         """
         Create a new user
-        
-        TODO: Implement user creation in database
+
+        Args:
+            user_data: User creation data
+
+        Returns:
+            Created User object
+
+        Raises:
+            ValueError: If user with email already exists
         """
         # Check if user already exists
         existing_user = self.get_user_by_email(user_data.email)
         if existing_user:
             raise ValueError("User with this email already exists")
-        
+
         # Hash password
         hashed_password = self.hash_password(user_data.password)
-        
-        # TODO: Insert user into database
-        # For now, return a placeholder
-        raise NotImplementedError("User creation not yet implemented")
+
+        # Create user in database
+        user = self.db_service.create_user(
+            email=user_data.email,
+            hashed_password=hashed_password,
+            full_name=user_data.full_name,
+            role=user_data.role
+        )
+
+        return user
     
     def get_user_by_email(self, email: str) -> Optional[User]:
         """
         Get user by email
-        
-        TODO: Implement user retrieval from database
+
+        Args:
+            email: User email address
+
+        Returns:
+            User object if found, None otherwise
         """
-        # TODO: Query database for user
-        return None
+        return self.db_service.get_user_by_email(email)
     
     def get_user_by_id(self, user_id: int) -> Optional[User]:
         """
         Get user by ID
-        
-        TODO: Implement user retrieval from database
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            User object if found, None otherwise
         """
-        # TODO: Query database for user
-        return None
+        return self.db_service.get_user_by_id(user_id)
     
     def authenticate_user(self, email: str, password: str) -> Token:
         """

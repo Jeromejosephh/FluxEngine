@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 from utils.config import settings
+from models.user import User
 
 
 class DuckDBService:
@@ -163,3 +164,112 @@ class DuckDBService:
         if self.conn:
             self.conn.close()
             self.conn = None
+
+    # User methods
+
+    def create_user(self, email: str, hashed_password: str, full_name: str, role: str) -> User:
+        """
+        Create a new user
+
+        Args:
+            email: User's email address
+            hashed_password: Pre-hashed password
+            full_name: User's full name
+            role: User role ('admin' or 'editor')
+
+        Returns:
+            Created User object
+
+        Raises:
+            Exception: If email already exists or other database error
+        """
+        query = """
+            INSERT INTO users (email, hashed_password, full_name, role, is_active, created_at, updated_at)
+            VALUES (?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            RETURNING id, email, hashed_password, full_name, role, is_active, created_at, updated_at
+        """
+
+        result = self.execute(query, (email, hashed_password, full_name, role))
+
+        if not result:
+            raise Exception("Failed to create user")
+
+        row = result[0]
+        return User(
+            id=row['id'],
+            email=row['email'],
+            hashed_password=row['hashed_password'],
+            full_name=row['full_name'],
+            role=row['role'],
+            is_active=row['is_active'],
+            created_at=row['created_at'],
+            updated_at=row['updated_at']
+        )
+
+    def get_user_by_email(self, email: str) -> Optional[User]:
+        """
+        Get user by email address
+
+        Args:
+            email: User's email address
+
+        Returns:
+            User object if found, None otherwise
+        """
+        query = """
+            SELECT id, email, hashed_password, full_name, role, is_active, created_at, updated_at
+            FROM users
+            WHERE email = ?
+            LIMIT 1
+        """
+
+        result = self.execute(query, (email,))
+
+        if not result:
+            return None
+
+        row = result[0]
+        return User(
+            id=row['id'],
+            email=row['email'],
+            hashed_password=row['hashed_password'],
+            full_name=row['full_name'],
+            role=row['role'],
+            is_active=row['is_active'],
+            created_at=row['created_at'],
+            updated_at=row['updated_at']
+        )
+
+    def get_user_by_id(self, user_id: int) -> Optional[User]:
+        """
+        Get user by ID
+
+        Args:
+            user_id: User's ID
+
+        Returns:
+            User object if found, None otherwise
+        """
+        query = """
+            SELECT id, email, hashed_password, full_name, role, is_active, created_at, updated_at
+            FROM users
+            WHERE id = ?
+            LIMIT 1
+        """
+
+        result = self.execute(query, (user_id,))
+
+        if not result:
+            return None
+
+        row = result[0]
+        return User(
+            id=row['id'],
+            email=row['email'],
+            hashed_password=row['hashed_password'],
+            full_name=row['full_name'],
+            role=row['role'],
+            is_active=row['is_active'],
+            created_at=row['created_at'],
+            updated_at=row['updated_at']
+        )
