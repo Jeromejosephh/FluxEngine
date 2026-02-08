@@ -75,8 +75,11 @@ class DuckDBService:
         
         # Users table
         conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_users_id START 1
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_users_id'),
                 email VARCHAR UNIQUE NOT NULL,
                 hashed_password VARCHAR NOT NULL,
                 full_name VARCHAR NOT NULL,
@@ -89,8 +92,11 @@ class DuckDBService:
         
         # Tables table
         conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_tables_id START 1
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS tables (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_tables_id'),
                 name VARCHAR NOT NULL,
                 description VARCHAR,
                 schema_definition VARCHAR NOT NULL,
@@ -104,8 +110,11 @@ class DuckDBService:
         
         # Workflows table
         conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_workflows_id START 1
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS workflows (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_workflows_id'),
                 name VARCHAR NOT NULL,
                 description VARCHAR,
                 status VARCHAR NOT NULL CHECK (status IN ('draft', 'active', 'archived')),
@@ -119,8 +128,11 @@ class DuckDBService:
         
         # Steps table
         conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_steps_id START 1
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS steps (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_steps_id'),
                 workflow_id INTEGER NOT NULL,
                 name VARCHAR NOT NULL,
                 step_type VARCHAR NOT NULL CHECK (step_type IN ('query', 'transform', 'condition', 'action')),
@@ -135,8 +147,11 @@ class DuckDBService:
         
         # Audit entries table
         conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_audit_entries_id START 1
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS audit_entries (
-                id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_audit_entries_id'),
                 user_id INTEGER,
                 action VARCHAR NOT NULL,
                 entity_type VARCHAR NOT NULL,

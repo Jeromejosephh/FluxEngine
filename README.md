@@ -88,10 +88,30 @@ FluxEngine/
    ```bash
    cp .env.example .env
    ```
-   
+
    Edit `.env` and set your configuration:
    - Generate a secure `SECRET_KEY`: `openssl rand -hex 32`
    - Adjust other settings as needed
+
+6. **Seed the database with initial data**
+   ```bash
+   # Non-interactive mode (uses default credentials)
+   python scripts/seed_db.py --non-interactive
+
+   # Interactive mode (prompts for admin credentials)
+   python scripts/seed_db.py
+
+   # Admin only (no sample data)
+   python scripts/seed_db.py --admin-only
+
+   # Reset database (drop and recreate)
+   python scripts/seed_db.py --force
+   ```
+
+   **Default Credentials (Non-Interactive):**
+   - Email: `admin@example.com`
+   - Password: `admin123`
+   - Role: `admin`
 
 ## 🚀 Running the Application
 
@@ -126,6 +146,11 @@ FastAPI automatically generates interactive API documentation:
 
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
+
+### Additional Documentation
+
+- **Authentication Guide**: See [AUTH.md](./AUTH.md) for comprehensive authentication documentation
+- **Development Guide**: See [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md) for project roadmap and architecture
 
 ## 🧪 Running Tests
 

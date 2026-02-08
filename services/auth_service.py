@@ -78,7 +78,7 @@ class AuthService:
         
         except jwt.ExpiredSignatureError:
             raise AuthenticationException("Token has expired")
-        except jwt.JWTError:
+        except jwt.PyJWTError:
             raise AuthenticationException("Invalid token")
     
     def create_user(self, user_data: UserCreate) -> User:
