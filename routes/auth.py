@@ -90,8 +90,6 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 async def get_current_user(token: str = Depends(oauth2_scheme)):
     """
     Get current authenticated user
-    
-    TODO: Implement token validation and user retrieval
     """
     auth_service = AuthService()
     
