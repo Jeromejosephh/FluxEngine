@@ -22,6 +22,11 @@ class TableUpdate(BaseModel):
     schema_definition: Optional[Dict[str, Any]] = None
 
 
+class RowUpdate(BaseModel):
+    """Schema for updating a single row in a managed table"""
+    data: Dict[str, Any]
+
+
 class TableResponse(TableBase):
     """Schema for table response"""
     id: int
