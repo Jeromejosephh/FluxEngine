@@ -1,8 +1,8 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-02-08 (Stage 2 Table Management Complete)
-**Project Status:** Early Development - Stage 2 Complete ✅
-**Current Phase:** Table Management (100% Complete)
+**Last Updated:** 2026-02-28 (Stage 4 In Progress — Real-time Monitoring Complete)
+**Project Status:** Early Development - Stage 4 In Progress 🔄
+**Current Phase:** Advanced Features (~29% Complete)
 
 ---
 
@@ -76,7 +76,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 
 ---
 
-### Stage 3: Workflow Engine 🔄 10% Complete
+### Stage 3: Workflow Engine (Complete) ✅ 100%
 **Objective:** Build the workflow execution engine with step orchestration.
 
 **Components:**
@@ -85,19 +85,29 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - Step execution engine
 - Workflow state management
 - Error handling and retry logic
-- Workflow scheduling and triggers
 
 **Status:**
 - ✅ Database schema for workflows and steps
-- ✅ API route structure defined
-- ⏳ Workflow service implementation
-- ⏳ Step execution logic
-- ⏳ Workflow state machine
-- ⏳ Tests for workflow execution
+- ✅ Workflow CRUD DB methods (create, get, list, update, soft delete)
+- ✅ Step CRUD DB methods (create, get by workflow, get by id)
+- ✅ WorkflowService with validation and CRUD
+- ✅ StepService with per-type config validation
+- ✅ Physical table data storage (insert rows, query rows with filters)
+- ✅ Table data endpoints (POST /tables/{id}/data, GET /tables/{id}/data)
+- ✅ ExecutionService — runs steps sequentially, passes output as context
+- ✅ Query step handler — filters rows from a managed table
+- ✅ Transform step handler — column projection + row filtering in Python
+- ✅ All workflow API endpoints (list, get, create, update, delete)
+- ✅ Step API endpoints (create step, list steps)
+- ✅ POST /api/workflows/{id}/run — executes workflow, returns per-step results
+- ✅ Audit logging for all workflow and step operations
+- ✅ Fixed DuckDB partial index IF NOT EXISTS bug on startup
+- ✅ Fixed DuckDB 0.10.0 ART index bug (removed idx_workflows_status — UPDATE on indexed column triggers false PK violation)
+- ✅ 20/20 workflow tests passing (now 28/28 with Stage 4 execution history tests added)
 
 ---
 
-### Stage 4: Advanced Features ⏳ 0% Complete
+### Stage 4: Advanced Features 🔄 ~29% Complete
 **Objective:** Add advanced capabilities for production readiness.
 
 **Components:**
@@ -110,7 +120,18 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - Database backup/restore
 
 **Status:**
-- ⏳ All components pending
+- ✅ Table row update endpoint (`PUT /api/tables/{id}/data/{row_id}`)
+- ✅ Table row delete endpoint (`DELETE /api/tables/{id}/data/{row_id}`)
+- ✅ Column validation and 404 handling for row mutations
+- ✅ 14/14 table tests passing
+- ✅ Real-time execution monitoring (`executions` table + `GET /api/workflows/{id}/runs`)
+- ✅ Execution records persist per-step metadata, row counts, success/error state
+- ✅ 28/28 workflow tests passing
+- ⏳ Action step type (webhook POST)
+- ⏳ Workflow scheduling (APScheduler)
+- ⏳ API rate limiting (slowapi)
+- ⏳ Caching layer
+- ⏳ Database backup/restore
 
 ---
 
@@ -163,30 +184,35 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Add table access control (RBAC)
 - [x] Write table management tests (8 manual tests passing)
 - [x] Fix DuckDB UPDATE bug (dynamic query builder)
-- [ ] Implement data insertion endpoint (deferred to workflow phase)
-- [ ] Implement data query endpoint (deferred to workflow phase)
-- [ ] Document table API (deferred)
+- [x] Implement data insertion endpoint (POST /api/tables/{id}/data)
+- [x] Implement data query endpoint (GET /api/tables/{id}/data)
+- [x] API documented via auto-generated Swagger UI at /docs
 
-### Phase 3: Workflow Engine
+### Phase 3: Workflow Engine ✅
 - [x] Define workflow/step schema
 - [x] Create workflow API routes structure
-- [ ] Implement workflow service
-- [ ] Implement step service
-- [ ] Create workflow execution engine
-- [ ] Implement step type handlers (query, transform, condition, action)
-- [ ] Add workflow state management
-- [ ] Implement error handling and retries
-- [ ] Create workflow CRUD endpoints
-- [ ] Add workflow execution endpoint
-- [ ] Write workflow execution tests
-- [ ] Document workflow configuration
+- [x] Implement workflow service (WorkflowService)
+- [x] Implement step service (StepService) with config validation
+- [x] Create workflow execution engine (ExecutionService)
+- [x] Implement step type handlers — query and transform
+- [x] Add workflow state management (draft / active / archived)
+- [x] Implement error handling (step failure stops pipeline, error surfaced in response)
+- [x] Create workflow CRUD endpoints (list, get, create, update, delete)
+- [x] Add step CRUD endpoints (create step, list steps)
+- [x] Add workflow execution endpoint (POST /run)
+- [x] Add table data endpoints (insert rows, query rows)
+- [x] Fix DuckDB partial index startup crash
+- [x] Write workflow execution tests
 
 ### Phase 4: Advanced Features
+- [x] Implement table row update endpoint (PUT /api/tables/{id}/data/{row_id})
+- [x] Implement table row delete endpoint (DELETE /api/tables/{id}/data/{row_id})
+- [x] Implement real-time monitoring (executions table + GET /api/workflows/{id}/runs)
+- [ ] Implement action step type (webhook POST)
+- [ ] Implement workflow scheduling (APScheduler)
+- [ ] Add API rate limiting (slowapi)
 - [ ] Create workflow templates
-- [ ] Implement real-time monitoring
 - [ ] Add workflow analytics
-- [ ] Implement notification system
-- [ ] Add API rate limiting
 - [ ] Configure caching layer
 - [ ] Implement backup/restore
 
@@ -206,13 +232,13 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 ## Progress Overview
 
 ```
-Overall Project Completion: ~40%
+Overall Project Completion: ~65%
 
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
-│ Stage 3: Workflow Engine      █░░░░░░░░░  10% 🔄            │
-│ Stage 4: Advanced Features    ░░░░░░░░░░   0% ⏳            │
+│ Stage 3: Workflow Engine      ██████████ 100% ✅            │
+│ Stage 4: Advanced Features    ██░░░░░░░░  29% 🔄            │
 │ Stage 5: Production Readiness ░░░░░░░░░░   0% ⏳            │
 └─────────────────────────────────────────────────────────────┘
 
@@ -238,10 +264,22 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ Table API endpoints (list, get, create, update, delete)
 - ✅ Case-insensitive unique table names
 - ✅ Reserved name protection
+- ✅ Table row update (`PUT /api/tables/{id}/data/{row_id}`)
+- ✅ Table row delete (`DELETE /api/tables/{id}/data/{row_id}`)
+- ✅ Execution history (`executions` table, `GET /api/workflows/{id}/runs`)
+- ✅ Per-step metadata persisted on every workflow run (no output bloat)
 
 ### In Progress
-- 🔄 Workflow service implementation
-- 🔄 Workflow execution engine
+- Stage 4: Advanced Features (row mutations + monitoring complete; rate limiting, action steps, scheduling pending)
+
+### Recently Completed
+- ✅ Real-time monitoring: `executions` table persists every workflow run
+- ✅ `GET /api/workflows/{id}/runs` — paginated execution history, newest first
+- ✅ `models/execution.py` dataclass + `StepSummary` / `ExecutionSummary` schemas
+- ✅ `DuckDBService.save_execution()` and `get_executions_for_workflow()` methods
+- ✅ 8 new execution history tests (28/28 workflow tests passing)
+- ✅ Table row update: `PUT /api/tables/{id}/data/{row_id}` with column validation
+- ✅ Table row delete: `DELETE /api/tables/{id}/data/{row_id}` with 404 guard
 
 ### Recently Fixed
 - ✅ bcrypt 5.0.0 → 4.1.2 compatibility issue
@@ -249,81 +287,37 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ JWT PyJWTError exception handling
 - ✅ Test database isolation with temporary files
 - ✅ DuckDB UPDATE with COALESCE causing PK constraint violation (replaced with dynamic query builder)
+- ✅ DuckDB partial index IF NOT EXISTS not respected on reconnect (wrapped in try/except)
+- ✅ DuckDB 0.10.0 ART index bug — UPDATE on any indexed column triggers false PK violation (removed idx_workflows_status)
+- ✅ `datetime.utcnow()` deprecation — replaced with `datetime.now(timezone.utc)` in all update methods
 
 ### Blocked/Issues
 - ⚠️ bcrypt 5.0.0 incompatible with passlib 1.7.4 (resolved: downgraded to 4.1.2)
 - ⚠️ DuckDB requires explicit sequences for auto-increment (resolved)
 - ⚠️ PyJWT uses `PyJWTError` not `JWTError` (resolved)
 - ⚠️ DuckDB UPDATE with COALESCE on schema_definition causes PK violation (resolved: dynamic query builder)
+- ⚠️ DuckDB 0.10.0 UPDATE on indexed column causes false PK violation (resolved: removed secondary index on status column)
 
 ---
 
 ## Next Actions
 
-### Immediate (This Sprint) - Phase 3: Workflow Engine
+### Next - Phase 4: Advanced Features
 
-1. **Implement Workflow Service** (PRIORITY)
-   - Create `WorkflowService` with workflow CRUD methods
-   - Implement workflow state management (draft, active, archived)
-   - Add workflow validation logic
-   - Implement DuckDB workflow methods
+1. **API Rate Limiting** ⬅ recommended next (small scope, production safety)
+   - Add slowapi middleware to protect the `/run` endpoint
 
-2. **Implement Step Service**
-   - Create `StepService` for step CRUD operations
-   - Implement step ordering and validation
-   - Support step types: query, transform, condition, action
-   - Add step configuration validation
+2. **Notification / Action Steps**
+   - Implement `action` step type that POSTs results to a webhook URL
+   - Add webhook URL config to step config schema
 
-3. **Workflow API Endpoints**
-   - POST `/api/workflows` - Create new workflow
-   - GET `/api/workflows` - List all workflows
-   - GET `/api/workflows/{id}` - Get workflow details
-   - PUT `/api/workflows/{id}` - Update workflow
-   - DELETE `/api/workflows/{id}` - Soft delete workflow
-   - POST `/api/workflows/{id}/steps` - Add step to workflow
-   - GET `/api/workflows/{id}/steps` - List workflow steps
+3. **Workflow Scheduling**
+   - Trigger workflows on a cron schedule (e.g. APScheduler)
+   - Store schedule config on the workflow model
 
-### Short Term (Next 2 Weeks)
-
-5. **Table Data Operations**
-   - POST `/api/tables/{id}/data` - Insert data into table
-   - GET `/api/tables/{id}/data` - Query table data with filters
-   - PUT `/api/tables/{id}/data/{row_id}` - Update row
-   - DELETE `/api/tables/{id}/data/{row_id}` - Delete row
-
-6. **Workflow Service Foundation**
-   - Implement `WorkflowService.create_workflow()`
-   - Implement `StepService.create_step()`
-   - Add step ordering and validation
-   - Create workflow CRUD endpoints
-
-7. **Documentation**
-   - Update README with setup instructions
-   - Document API authentication flow
-   - Add OpenAPI/Swagger documentation
-   - Create architecture diagram
-
-### Medium Term (Next Month)
-
-8. **Workflow Execution Engine**
-   - Implement step execution dispatcher
-   - Add query step handler
-   - Add transform step handler
-   - Add condition step handler
-   - Add action step handler
-   - Implement workflow state machine
-
-9. **Error Handling & Validation**
-   - Add comprehensive input validation
-   - Implement better error messages
-   - Add request logging middleware
-   - Create error response standardization
-
-10. **Testing & Quality**
-    - Set up pytest fixtures
-    - Achieve 60%+ test coverage
-    - Set up pre-commit hooks
-    - Configure linting (black, flake8, mypy)
+4. **Testing & Quality**
+   - Achieve 70%+ test coverage
+   - Fix remaining auth test failures (RBAC fixture, JWT timing)
 
 ---
 
@@ -391,17 +385,22 @@ FluxEngine/
 │   ├── user.py
 │   ├── table.py
 │   ├── workflow.py
-│   └── step.py
+│   ├── step.py
+│   └── execution.py
 ├── schemas/                # Pydantic validation schemas
 │   ├── user.py
 │   ├── auth.py
 │   ├── table.py
-│   └── workflow.py
+│   ├── workflow.py
+│   └── execution.py
 ├── services/               # Business logic layer
 │   ├── duckdb_service.py
 │   ├── auth_service.py
 │   ├── audit_service.py
-│   └── table_service.py (TODO)
+│   ├── table_service.py
+│   ├── workflow_service.py
+│   ├── step_service.py
+│   └── execution_service.py
 ├── routes/                 # API endpoints
 │   ├── auth.py
 │   ├── tables.py
@@ -491,6 +490,30 @@ pytest tests/test_auth.py --cov=services --cov=routes --cov-report=html
 # Run specific test class
 pytest tests/test_auth.py::TestPasswordHashing -v
 ```
+
+---
+
+### Table Tests (`tests/test_tables.py`)
+
+**Status:** 14/14 tests passing (100% pass rate) ✅
+
+**Test Categories:**
+- ✅ Auth guards (4/4 tests) — list, create, update row, delete row without token
+- ✅ Row update — success, multi-column, 404, unknown column, empty data, table not found (6/6)
+- ✅ Row delete — success, 404, table not found, double-delete (4/4)
+
+---
+
+### Workflow Tests (`tests/test_workflows.py`)
+
+**Status:** 28/28 tests passing (100% pass rate) ✅
+
+**Test Categories:**
+- ✅ Workflow CRUD (8/8 tests)
+- ✅ Step CRUD (4/4 tests)
+- ✅ Table data insert/query (2/2 tests)
+- ✅ Workflow execution — query, transform, error cases (6/6 tests)
+- ✅ Execution history — persist, paginate, auth, 404 (8/8 tests)
 
 ---
 

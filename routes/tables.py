@@ -1,15 +1,20 @@
 """Table management routes"""
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Dict, Any, Optional
 
-from schemas.table import TableCreate, TableUpdate, TableResponse
+from schemas.table import TableCreate, TableUpdate, TableResponse, RowUpdate
 from routes.auth import oauth2_scheme
 from utils.security import require_role
 from services.auth_service import AuthService
 from services.table_service import TableService
 from services.audit_service import AuditService
 from utils.exceptions import ValidationException, NotFoundException, DatabaseException
+from pydantic import BaseModel
+
+
+class RowsInsert(BaseModel):
+    rows: List[Dict[str, Any]]
 
 router = APIRouter()
 
@@ -264,3 +269,114 @@ async def delete_table(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/{table_id}/data", status_code=status.HTTP_201_CREATED)
+async def insert_rows(
+    table_id: int,
+    body: RowsInsert,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Insert rows into a managed table (requires admin or editor role)"""
+    user = await get_current_user_from_token(token)
+    table_service = TableService()
+
+    try:
+        table = table_service.get_table_by_id(table_id)
+        schema = json.loads(table.schema_definition)
+        allowed_columns = {col["name"] for col in schema.get("columns", [])}
+
+        for i, row in enumerate(body.rows):
+            unknown = set(row.keys()) - allowed_columns
+            if unknown:
+                raise ValidationException(
+                    f"Row {i} contains unknown columns: {', '.join(sorted(unknown))}. "
+                    f"Allowed: {', '.join(sorted(allowed_columns))}"
+                )
+
+        from services.duckdb_service import DuckDBService
+        db = DuckDBService()
+        inserted = db.insert_rows(table, body.rows)
+        return {"inserted": inserted}
+
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+    except ValidationException as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/{table_id}/data")
+async def query_rows(
+    table_id: int,
+    token: str = Depends(oauth2_scheme)
+):
+    """Query all rows from a managed table"""
+    await get_current_user_from_token(token)
+    table_service = TableService()
+
+    try:
+        table = table_service.get_table_by_id(table_id)
+        from services.duckdb_service import DuckDBService
+        db = DuckDBService()
+        rows = db.query_rows(table)
+        return {"table_id": table_id, "rows": rows, "count": len(rows)}
+
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.put("/{table_id}/data/{row_id}")
+async def update_row(
+    table_id: int,
+    row_id: int,
+    body: RowUpdate,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Update a single row in a managed table (requires admin or editor role)"""
+    await get_current_user_from_token(token)
+    table_service = TableService()
+
+    try:
+        if not body.data:
+            raise ValidationException("No fields provided to update")
+        table = table_service.get_table_by_id(table_id)
+        from services.duckdb_service import DuckDBService
+        db = DuckDBService()
+        db.update_row(table, row_id, body.data)
+        return {"updated": 1, "row_id": row_id}
+
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+    except ValidationException as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.delete("/{table_id}/data/{row_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_row(
+    table_id: int,
+    row_id: int,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Delete a single row from a managed table (requires admin or editor role)"""
+    await get_current_user_from_token(token)
+    table_service = TableService()
+
+    try:
+        table = table_service.get_table_by_id(table_id)
+        from services.duckdb_service import DuckDBService
+        db = DuckDBService()
+        db.delete_row(table, row_id)
+
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
