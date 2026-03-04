@@ -107,7 +107,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 
 ---
 
-### Stage 4: Advanced Features 🔄 ~29% Complete
+### Stage 4: Advanced Features 🔄 ~43% Complete
 **Objective:** Add advanced capabilities for production readiness.
 
 **Components:**
@@ -129,7 +129,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ 28/28 workflow tests passing
 - ⏳ Action step type (webhook POST)
 - ⏳ Workflow scheduling (APScheduler)
-- ⏳ API rate limiting (slowapi)
+- ✅ API rate limiting (slowapi — 10/minute on `/run`, shared limiter, disabled in tests)
 - ⏳ Caching layer
 - ⏳ Database backup/restore
 
@@ -210,7 +210,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Implement real-time monitoring (executions table + GET /api/workflows/{id}/runs)
 - [ ] Implement action step type (webhook POST)
 - [ ] Implement workflow scheduling (APScheduler)
-- [ ] Add API rate limiting (slowapi)
+- [x] Add API rate limiting (slowapi — 10/minute on /run endpoint)
 - [ ] Create workflow templates
 - [ ] Add workflow analytics
 - [ ] Configure caching layer
@@ -238,7 +238,7 @@ Overall Project Completion: ~65%
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
-│ Stage 4: Advanced Features    ██░░░░░░░░  29% 🔄            │
+│ Stage 4: Advanced Features    ████░░░░░░  43% 🔄            │
 │ Stage 5: Production Readiness ░░░░░░░░░░   0% ⏳            │
 └─────────────────────────────────────────────────────────────┘
 
@@ -304,8 +304,8 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 
 ### Next - Phase 4: Advanced Features
 
-1. **API Rate Limiting** ⬅ recommended next (small scope, production safety)
-   - Add slowapi middleware to protect the `/run` endpoint
+1. **Dockerfile** ⬅ recommended next (needed for any deployment)
+   - Standard FastAPI container, copy data dir, expose port 8000
 
 2. **Notification / Action Steps**
    - Implement `action` step type that POSTs results to a webhook URL

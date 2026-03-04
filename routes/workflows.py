@@ -1,7 +1,8 @@
 """Workflow management routes"""
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from typing import List
+from utils.limiter import limiter
 
 from schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 from schemas.step import StepCreate, StepResponse
@@ -227,7 +228,9 @@ async def list_workflow_steps(
 # ---------------------------------------------------------------------------
 
 @router.post("/{workflow_id}/run", response_model=ExecutionResult)
+@limiter.limit("10/minute")
 async def run_workflow(
+    request: Request,
     workflow_id: int,
     token: str = Depends(oauth2_scheme)
 ):
