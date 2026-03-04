@@ -1,8 +1,8 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-02-28 (Stage 4 In Progress — Real-time Monitoring Complete)
-**Project Status:** Early Development - Stage 4 In Progress 🔄
-**Current Phase:** Advanced Features (~29% Complete)
+**Last Updated:** 2026-03-04 (Stage 4 In Progress — Rate Limiting + Dockerfile Complete)
+**Project Status:** Early Development - Stage 4 + Stage 5 In Progress 🔄
+**Current Phase:** Advanced Features + Production Readiness
 
 ---
 
@@ -135,7 +135,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 
 ---
 
-### Stage 5: Production Readiness ⏳ 0% Complete
+### Stage 5: Production Readiness 🔄 ~13% Complete
 **Objective:** Prepare system for production deployment.
 
 **Components:**
@@ -149,7 +149,15 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - Security audit and hardening
 
 **Status:**
-- ⏳ All components pending
+- ✅ Dockerfile (python:3.9-slim, exposes port 8000)
+- ✅ .dockerignore (excludes venv, data, .env, caches)
+- ✅ .env.example with all required variables
+- ✅ .gitignore covers .env, data/, .venv
+- ⏳ CI/CD pipeline (GitHub Actions)
+- ⏳ >80% test coverage
+- ⏳ Performance optimization
+- ⏳ Security audit
+- ⏳ Deployment guide
 
 ---
 
@@ -217,11 +225,13 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [ ] Implement backup/restore
 
 ### Phase 5: Production
+- [x] Create Dockerfile
+- [x] Create .dockerignore
+- [x] Create .env.example
+- [ ] Set up CI/CD pipeline (GitHub Actions)
+- [ ] Configure production environment
 - [ ] Achieve >80% test coverage
 - [ ] Performance optimization
-- [ ] Create Dockerfile
-- [ ] Set up CI/CD pipeline
-- [ ] Configure production environment
 - [ ] Implement monitoring/logging
 - [ ] Complete API documentation
 - [ ] Security audit
@@ -232,14 +242,14 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 ## Progress Overview
 
 ```
-Overall Project Completion: ~65%
+Overall Project Completion: ~70%
 
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
 │ Stage 4: Advanced Features    ████░░░░░░  43% 🔄            │
-│ Stage 5: Production Readiness ░░░░░░░░░░   0% ⏳            │
+│ Stage 5: Production Readiness █░░░░░░░░░  13% 🔄            │
 └─────────────────────────────────────────────────────────────┘
 
 Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
@@ -270,9 +280,13 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ Per-step metadata persisted on every workflow run (no output bloat)
 
 ### In Progress
-- Stage 4: Advanced Features (row mutations + monitoring complete; rate limiting, action steps, scheduling pending)
+- Stage 4: Advanced Features (row mutations, monitoring, rate limiting complete; action steps, scheduling pending)
+- Stage 5: Production Readiness (Docker done; CI/CD, test coverage, security audit pending)
 
 ### Recently Completed
+- ✅ Dockerfile — `python:3.9-slim`, installs deps, exposes port 8000
+- ✅ `.dockerignore` — excludes venv, data dir, .env, caches
+- ✅ API rate limiting: 10/minute on `/run`, shared `utils/limiter.py`, disabled in tests via `conftest.py`
 - ✅ Real-time monitoring: `executions` table persists every workflow run
 - ✅ `GET /api/workflows/{id}/runs` — paginated execution history, newest first
 - ✅ `models/execution.py` dataclass + `StepSummary` / `ExecutionSummary` schemas
@@ -304,8 +318,8 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 
 ### Next - Phase 4: Advanced Features
 
-1. **Dockerfile** ⬅ recommended next (needed for any deployment)
-   - Standard FastAPI container, copy data dir, expose port 8000
+1. **GitHub Actions CI** ⬅ recommended next (run tests on every push)
+   - `.github/workflows/test.yml` — install deps, run pytest
 
 2. **Notification / Action Steps**
    - Implement `action` step type that POSTs results to a webhook URL
@@ -334,6 +348,19 @@ python main.py
 
 # Or with uvicorn directly
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Docker
+
+```bash
+# Build image
+docker build -t fluxengine .
+
+# Run container (pass env file, persist data volume)
+docker run -p 8000:8000 \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  fluxengine
 ```
 
 ### Database Management
