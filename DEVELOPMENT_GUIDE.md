@@ -1,7 +1,7 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-03-04 (Stage 4 In Progress — Rate Limiting + Dockerfile Complete)
-**Project Status:** Early Development - Stage 4 + Stage 5 In Progress 🔄
+**Last Updated:** 2026-03-09 (All 93 tests passing — MVP Complete)
+**Project Status:** MVP Complete ✅
 **Current Phase:** Advanced Features + Production Readiness
 
 ---
@@ -46,7 +46,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ JWT token generation and validation
 - ✅ Authentication endpoints (register, login, /me)
 - ✅ Exception handling framework
-- ✅ Comprehensive test coverage (46/51 tests passing, 90%)
+- ✅ Comprehensive test coverage (51/51 tests passing, 100%)
 - ✅ Database seeding script with admin user creation
 - ✅ Complete authentication documentation (AUTH.md)
 
@@ -103,7 +103,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ Audit logging for all workflow and step operations
 - ✅ Fixed DuckDB partial index IF NOT EXISTS bug on startup
 - ✅ Fixed DuckDB 0.10.0 ART index bug (removed idx_workflows_status — UPDATE on indexed column triggers false PK violation)
-- ✅ 20/20 workflow tests passing (now 28/28 with Stage 4 execution history tests added)
+- ✅ 28/28 workflow tests passing
 
 ---
 
@@ -153,7 +153,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ .dockerignore (excludes venv, data, .env, caches)
 - ✅ .env.example with all required variables
 - ✅ .gitignore covers .env, data/, .venv
-- ⏳ CI/CD pipeline (GitHub Actions)
+- ✅ CI/CD pipeline (GitHub Actions — runs on push/PR to main)
 - ⏳ >80% test coverage
 - ⏳ Performance optimization
 - ⏳ Security audit
@@ -228,7 +228,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Create Dockerfile
 - [x] Create .dockerignore
 - [x] Create .env.example
-- [ ] Set up CI/CD pipeline (GitHub Actions)
+- [x] Set up CI/CD pipeline (GitHub Actions)
 - [ ] Configure production environment
 - [ ] Achieve >80% test coverage
 - [ ] Performance optimization
@@ -242,14 +242,14 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 ## Progress Overview
 
 ```
-Overall Project Completion: ~70%
+Overall Project Completion: ~80% (MVP Complete)
 
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
 │ Stage 4: Advanced Features    ████░░░░░░  43% 🔄            │
-│ Stage 5: Production Readiness █░░░░░░░░░  13% 🔄            │
+│ Stage 5: Production Readiness ████░░░░░░  40% 🔄            │
 └─────────────────────────────────────────────────────────────┘
 
 Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
@@ -284,18 +284,21 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - Stage 5: Production Readiness (Docker done; CI/CD, test coverage, security audit pending)
 
 ### Recently Completed
+- ✅ All 93 tests passing (51 auth + 14 table + 28 workflow) — 100% pass rate
+- ✅ Fixed RBAC: `require_admin`/`require_editor` made async, now correctly resolve user via FastAPI dependency injection
+- ✅ Fixed JWT timezone bug: test now uses `timezone.utc` on both sides
+- ✅ GitHub Actions CI — `.github/workflows/test.yml`, runs pytest on push/PR to main
 - ✅ Dockerfile — `python:3.9-slim`, installs deps, exposes port 8000
 - ✅ `.dockerignore` — excludes venv, data dir, .env, caches
 - ✅ API rate limiting: 10/minute on `/run`, shared `utils/limiter.py`, disabled in tests via `conftest.py`
 - ✅ Real-time monitoring: `executions` table persists every workflow run
 - ✅ `GET /api/workflows/{id}/runs` — paginated execution history, newest first
-- ✅ `models/execution.py` dataclass + `StepSummary` / `ExecutionSummary` schemas
-- ✅ `DuckDBService.save_execution()` and `get_executions_for_workflow()` methods
-- ✅ 8 new execution history tests (28/28 workflow tests passing)
 - ✅ Table row update: `PUT /api/tables/{id}/data/{row_id}` with column validation
 - ✅ Table row delete: `DELETE /api/tables/{id}/data/{row_id}` with 404 guard
 
 ### Recently Fixed
+- ✅ RBAC coroutine bug — `require_admin`/`require_editor` returned unawaited coroutine; fixed by making them `async def` with `await`
+- ✅ JWT timing test — `datetime.fromtimestamp()` vs `datetime.utcnow()` timezone mismatch; fixed with `timezone.utc`
 - ✅ bcrypt 5.0.0 → 4.1.2 compatibility issue
 - ✅ DuckDB sequences for auto-increment IDs
 - ✅ JWT PyJWTError exception handling
@@ -316,10 +319,11 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 
 ## Next Actions
 
-### Next - Phase 4: Advanced Features
+### MVP Complete ✅
 
-1. **GitHub Actions CI** ⬅ recommended next (run tests on every push)
-   - `.github/workflows/test.yml` — install deps, run pytest
+All MVP items shipped. Next focus is post-MVP features.
+
+### Post-MVP — Phase 4 Remainder
 
 2. **Notification / Action Steps**
    - Implement `action` step type that POSTs results to a webhook URL
@@ -487,24 +491,20 @@ FluxEngine/
 
 ### Authentication Tests (`tests/test_auth.py`)
 
-**Status:** 46/51 tests passing (90% pass rate) ✅
+**Status:** 51/51 tests passing (100% pass rate) ✅
 
 **Test Categories:**
 - ✅ Password Hashing (4/4 tests)
-- ✅ JWT Tokens (5/6 tests) - 1 timing test failure (non-critical)
+- ✅ JWT Tokens (6/6 tests)
 - ✅ User CRUD (6/6 tests)
 - ✅ User Authentication (7/7 tests)
 - ✅ Registration Endpoint (6/6 tests)
 - ✅ Login Endpoint (6/6 tests)
 - ✅ Get Current User (4/4 tests)
-- ⚠️ RBAC (1/5 tests) - Test fixture setup issue (non-critical)
+- ✅ RBAC (5/5 tests)
 - ✅ Input Validation (3/3 tests)
 - ✅ Security Edge Cases (3/3 tests)
 - ✅ Health Check (1/1 test)
-
-**Known Test Issues:**
-1. JWT timing test - Timezone calculation needs adjustment
-2. RBAC tests - Async dependency injection pattern in test fixtures
 
 **Running Tests:**
 ```bash
