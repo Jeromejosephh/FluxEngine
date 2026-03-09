@@ -54,19 +54,11 @@ def require_role(allowed_roles: List[str]) -> Callable:
     return check_role
 
 
-def require_admin(token: str = Depends(oauth2_scheme)):
-    """
-    Dependency for admin-only endpoints
-    
-    Shortcut for require_role(["admin"])
-    """
-    return require_role(["admin"])(token)
+async def require_admin(token: str = Depends(oauth2_scheme)):
+    """Dependency for admin-only endpoints"""
+    return await require_role(["admin"])(token)
 
 
-def require_editor(token: str = Depends(oauth2_scheme)):
-    """
-    Dependency for editor or admin endpoints
-    
-    Shortcut for require_role(["admin", "editor"])
-    """
-    return require_role(["admin", "editor"])(token)
+async def require_editor(token: str = Depends(oauth2_scheme)):
+    """Dependency for editor or admin endpoints"""
+    return await require_role(["admin", "editor"])(token)
