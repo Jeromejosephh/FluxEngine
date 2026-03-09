@@ -9,7 +9,7 @@ Test coverage for:
 """
 import pytest
 import jwt as pyjwt
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from fastapi.testclient import TestClient
 from fastapi import FastAPI, Depends, HTTPException, status
 from typing import Dict
@@ -278,8 +278,8 @@ class TestJWTTokens:
         payload = pyjwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
 
         exp_timestamp = payload["exp"]
-        exp_datetime = datetime.fromtimestamp(exp_timestamp)
-        now = datetime.utcnow()
+        exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+        now = datetime.now(timezone.utc)
 
         # Should expire in approximately 5 minutes
         delta = exp_datetime - now
