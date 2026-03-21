@@ -16,7 +16,7 @@ class StepService:
         "query": ["table_id"],
         "transform": [],   # select_columns and/or filter are optional
         "condition": [],
-        "action": [],
+        "action": ["webhook_url"],
     }
 
     def __init__(self):
@@ -56,6 +56,23 @@ class StepService:
                     raise ValidationException(
                         f"Transform filter op '{f['op']}' not supported. Use: {', '.join(sorted(allowed_ops))}"
                     )
+
+        if step_type == "action":
+            webhook_url = config.get("webhook_url", "")
+            if not isinstance(webhook_url, str) or not webhook_url.startswith(("http://", "https://")):
+                raise ValidationException(
+                    "Action step 'webhook_url' must be a valid http:// or https:// URL"
+                )
+            timeout = config.get("timeout_seconds")
+            if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
+                raise ValidationException(
+                    "Action step 'timeout_seconds' must be a positive number"
+                )
+            headers = config.get("headers")
+            if headers is not None and not isinstance(headers, dict):
+                raise ValidationException(
+                    "Action step 'headers' must be a dict of string key-value pairs"
+                )
 
     def create_step(self, workflow_id: int, data: StepCreate, user_id: int) -> Step:
         """

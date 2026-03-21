@@ -1,5 +1,7 @@
 """Workflow execution engine"""
 import json
+import urllib.request
+import urllib.error
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -80,8 +82,10 @@ class ExecutionService:
                 output = self._run_query_step(config)
             elif step.step_type == "transform":
                 output = self._run_transform_step(config, context_rows)
+            elif step.step_type == "action":
+                output = self._run_action_step(config, context_rows)
             else:
-                # condition / action — not yet implemented, pass through
+                # condition — not yet implemented, pass through
                 output = context_rows
 
             return StepResult(
@@ -159,6 +163,57 @@ class ExecutionService:
             result = [{k: row[k] for k in select_columns if k in row} for row in result]
 
         return result
+
+    def _run_action_step(
+        self,
+        config: Dict[str, Any],
+        rows: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Action step — POSTs the current context rows as JSON to a webhook URL.
+
+        Config shape:
+          {
+            "webhook_url": "https://example.com/hook",
+            "timeout_seconds": 10,        # optional, default 30
+            "headers": {"X-Token": "abc"} # optional extra request headers
+          }
+
+        Returns the original rows unchanged so downstream steps still have data.
+        Raises ValueError on HTTP errors or network failures.
+        """
+        webhook_url = config["webhook_url"]
+        timeout = config.get("timeout_seconds", 30)
+        extra_headers = config.get("headers", {})
+
+        payload = json.dumps(rows).encode("utf-8")
+        req = urllib.request.Request(
+            webhook_url,
+            data=payload,
+            method="POST",
+        )
+        req.add_header("Content-Type", "application/json")
+        for key, value in extra_headers.items():
+            req.add_header(key, value)
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            raise ValueError(
+                f"Webhook POST to {webhook_url} failed with HTTP {exc.code}: {exc.reason}"
+            )
+        except urllib.error.URLError as exc:
+            raise ValueError(
+                f"Webhook POST to {webhook_url} failed: {exc.reason}"
+            )
+
+        if status >= 400:
+            raise ValueError(
+                f"Webhook POST to {webhook_url} returned unexpected status {status}"
+            )
+
+        return rows   # pass rows through to downstream steps
 
     @staticmethod
     def _apply_op(cell_value: Any, op: str, target: Any) -> bool:

@@ -28,6 +28,9 @@ httpx==0.26.0
 slowapi==0.1.9
 limits==3.7.0
 
+# Scheduling
+apscheduler==3.10.4
+
 # Development
 black==24.1.1
 flake8==7.0.0
