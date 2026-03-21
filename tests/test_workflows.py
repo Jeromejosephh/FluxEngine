@@ -5,12 +5,14 @@ Covers:
 - Workflow CRUD endpoints
 - Step creation and listing
 - Table data insert/query
-- Workflow execution (query + transform steps)
+- Workflow execution (query + transform + action steps)
+- Workflow scheduling (cron schedule CRUD + validation)
 - Auth enforcement on all workflow endpoints
 """
 import os
 import json
 import pytest
+from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 from main import app
@@ -433,3 +435,318 @@ class TestExecutionHistory:
             assert len(runs) == 1
             assert runs[0]["success"] is False
             assert runs[0]["error"] is not None
+
+
+# ==============================================================================
+# Action Steps
+# ==============================================================================
+
+class TestActionStep:
+
+    def _make_webhook_mock(self, status=200):
+        """Return a context manager mock that simulates urllib.request.urlopen."""
+        mock_resp = MagicMock()
+        mock_resp.status = status
+        mock_resp.__enter__ = lambda s: mock_resp
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        return mock_resp
+
+    def _create_workflow_with_action(self, auth_headers, sample_table, webhook_url="https://hook.example.com/"):
+        """Create an active workflow: query → action."""
+        r = client.post("/api/workflows/", json={"name": "Action WF", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+
+        client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Fetch rows", "step_type": "query", "workflow_id": wf_id, "order": 0,
+            "config": {"table_id": sample_table}
+        }, headers=auth_headers)
+
+        r2 = client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Post to webhook", "step_type": "action", "workflow_id": wf_id, "order": 1,
+            "config": {"webhook_url": webhook_url}
+        }, headers=auth_headers)
+        assert r2.status_code == 201, r2.text
+
+        client.put(f"/api/workflows/{wf_id}", json={"status": "active"}, headers=auth_headers)
+        return wf_id
+
+    # --- Config validation ---
+
+    def test_action_step_requires_webhook_url(self, auth_headers, test_db):
+        r = client.post("/api/workflows/", json={"name": "WF", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+        r2 = client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Bad action", "step_type": "action", "workflow_id": wf_id, "order": 0,
+            "config": {}
+        }, headers=auth_headers)
+        assert r2.status_code == 422
+
+    def test_action_step_rejects_invalid_url(self, auth_headers, test_db):
+        r = client.post("/api/workflows/", json={"name": "WF", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+        r2 = client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Bad URL", "step_type": "action", "workflow_id": wf_id, "order": 0,
+            "config": {"webhook_url": "not-a-url"}
+        }, headers=auth_headers)
+        assert r2.status_code == 422
+
+    def test_action_step_rejects_invalid_timeout(self, auth_headers, test_db):
+        r = client.post("/api/workflows/", json={"name": "WF", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+        r2 = client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Bad timeout", "step_type": "action", "workflow_id": wf_id, "order": 0,
+            "config": {"webhook_url": "https://hook.example.com/", "timeout_seconds": -1}
+        }, headers=auth_headers)
+        assert r2.status_code == 422
+
+    def test_action_step_rejects_invalid_headers(self, auth_headers, test_db):
+        r = client.post("/api/workflows/", json={"name": "WF", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+        r2 = client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Bad headers", "step_type": "action", "workflow_id": wf_id, "order": 0,
+            "config": {"webhook_url": "https://hook.example.com/", "headers": "not-a-dict"}
+        }, headers=auth_headers)
+        assert r2.status_code == 422
+
+    # --- Execution ---
+
+    def test_action_step_posts_rows_to_webhook(self, auth_headers, test_db, sample_table):
+        wf_id = self._create_workflow_with_action(auth_headers, sample_table)
+        mock_resp = self._make_webhook_mock(status=200)
+
+        with patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
+            r = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
+
+        assert r.status_code == 200
+        result = r.json()
+        assert result["success"] is True
+        assert len(result["steps"]) == 2
+        assert result["steps"][1]["step_type"] == "action"
+        assert result["steps"][1]["success"] is True
+
+        # Verify HTTP call was made with JSON body
+        mock_open.assert_called_once()
+        req_arg = mock_open.call_args[0][0]
+        posted_data = json.loads(req_arg.data.decode())
+        assert isinstance(posted_data, list)
+        assert len(posted_data) == 3   # all rows from sample_table
+
+    def test_action_step_passes_rows_to_next_step(self, auth_headers, test_db, sample_table):
+        """Rows must be passed through so a downstream transform can still act on them."""
+        r = client.post("/api/workflows/", json={"name": "Action PassThrough", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+
+        client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Query", "step_type": "query", "workflow_id": wf_id, "order": 0,
+            "config": {"table_id": sample_table}
+        }, headers=auth_headers)
+        client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Notify", "step_type": "action", "workflow_id": wf_id, "order": 1,
+            "config": {"webhook_url": "https://hook.example.com/"}
+        }, headers=auth_headers)
+        client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Project", "step_type": "transform", "workflow_id": wf_id, "order": 2,
+            "config": {"select_columns": ["issue_type"]}
+        }, headers=auth_headers)
+        client.put(f"/api/workflows/{wf_id}", json={"status": "active"}, headers=auth_headers)
+
+        mock_resp = self._make_webhook_mock(status=200)
+        with patch("urllib.request.urlopen", return_value=mock_resp):
+            r = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
+
+        result = r.json()
+        assert result["success"] is True
+        assert len(result["steps"]) == 3
+        for row in result["final_output"]:
+            assert list(row.keys()) == ["issue_type"]
+
+    def test_action_step_http_error_fails_workflow(self, auth_headers, test_db, sample_table):
+        wf_id = self._create_workflow_with_action(auth_headers, sample_table)
+
+        import urllib.error
+        with patch("urllib.request.urlopen", side_effect=urllib.error.HTTPError(
+            url="https://hook.example.com/", code=500, msg="Internal Server Error",
+            hdrs=None, fp=None
+        )):
+            r = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
+
+        assert r.status_code == 200
+        result = r.json()
+        assert result["success"] is False
+        action_step = result["steps"][1]
+        assert action_step["success"] is False
+        assert "500" in action_step["error"]
+
+    def test_action_step_url_error_fails_workflow(self, auth_headers, test_db, sample_table):
+        wf_id = self._create_workflow_with_action(auth_headers, sample_table)
+
+        import urllib.error
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("connection refused")):
+            r = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
+
+        result = r.json()
+        assert result["success"] is False
+        assert result["steps"][1]["success"] is False
+
+    def test_action_step_with_custom_headers(self, auth_headers, test_db, sample_table):
+        r = client.post("/api/workflows/", json={"name": "Custom Headers WF", "status": "draft"}, headers=auth_headers)
+        wf_id = r.json()["id"]
+        client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Query", "step_type": "query", "workflow_id": wf_id, "order": 0,
+            "config": {"table_id": sample_table}
+        }, headers=auth_headers)
+        client.post(f"/api/workflows/{wf_id}/steps", json={
+            "name": "Notify", "step_type": "action", "workflow_id": wf_id, "order": 1,
+            "config": {
+                "webhook_url": "https://hook.example.com/",
+                "headers": {"X-Secret": "token123"},
+                "timeout_seconds": 5
+            }
+        }, headers=auth_headers)
+        client.put(f"/api/workflows/{wf_id}", json={"status": "active"}, headers=auth_headers)
+
+        mock_resp = self._make_webhook_mock(status=201)
+        with patch("urllib.request.urlopen", return_value=mock_resp) as mock_open:
+            r = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
+
+        assert r.json()["success"] is True
+        req_arg = mock_open.call_args[0][0]
+        assert req_arg.get_header("X-secret") == "token123"
+
+
+# ==============================================================================
+# Scheduling
+# ==============================================================================
+
+class TestScheduling:
+
+    def _make_workflow(self, auth_headers):
+        r = client.post("/api/workflows/", json={"name": "Sched WF", "status": "active"}, headers=auth_headers)
+        assert r.status_code == 201
+        return r.json()["id"]
+
+    # --- cron validation ---
+
+    def test_validate_cron_valid(self):
+        from services.scheduler_service import validate_cron
+        validate_cron("0 * * * *")    # every hour
+        validate_cron("*/5 * * * *")  # every 5 minutes
+        validate_cron("0 9 * * 1")    # every Monday at 09:00
+
+    def test_validate_cron_invalid(self):
+        from services.scheduler_service import validate_cron
+        from utils.exceptions import ValidationException
+        with pytest.raises(ValidationException):
+            validate_cron("not-a-cron")
+        with pytest.raises(ValidationException):
+            validate_cron("60 * * * *")   # minute out of range
+
+    # --- API: create ---
+
+    def test_create_schedule(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        r = client.post(f"/api/workflows/{wf_id}/schedule", json={
+            "cron_expr": "0 * * * *", "is_enabled": True
+        }, headers=auth_headers)
+        assert r.status_code == 201, r.text
+        data = r.json()
+        assert data["workflow_id"] == wf_id
+        assert data["cron_expr"] == "0 * * * *"
+        assert data["is_enabled"] is True
+        assert data["next_run_at"] is not None
+
+    def test_create_schedule_replaces_existing(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 * * * *"}, headers=auth_headers)
+        r = client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "*/15 * * * *"}, headers=auth_headers)
+        assert r.status_code == 201
+        assert r.json()["cron_expr"] == "*/15 * * * *"
+
+    def test_create_schedule_rejects_invalid_cron(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        r = client.post(f"/api/workflows/{wf_id}/schedule", json={
+            "cron_expr": "bad cron"
+        }, headers=auth_headers)
+        assert r.status_code == 422
+
+    def test_create_schedule_workflow_not_found(self, auth_headers, test_db):
+        r = client.post("/api/workflows/9999/schedule", json={"cron_expr": "0 * * * *"}, headers=auth_headers)
+        assert r.status_code == 404
+
+    def test_create_schedule_requires_auth(self):
+        r = client.post("/api/workflows/1/schedule", json={"cron_expr": "0 * * * *"})
+        assert r.status_code == 401
+
+    # --- API: get ---
+
+    def test_get_schedule(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 9 * * *"}, headers=auth_headers)
+        r = client.get(f"/api/workflows/{wf_id}/schedule", headers=auth_headers)
+        assert r.status_code == 200
+        assert r.json()["cron_expr"] == "0 9 * * *"
+
+    def test_get_schedule_not_found(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        r = client.get(f"/api/workflows/{wf_id}/schedule", headers=auth_headers)
+        assert r.status_code == 404
+
+    def test_get_schedule_requires_auth(self):
+        r = client.get("/api/workflows/1/schedule")
+        assert r.status_code == 401
+
+    # --- API: patch ---
+
+    def test_patch_schedule_cron(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 * * * *"}, headers=auth_headers)
+        r = client.patch(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 12 * * *"}, headers=auth_headers)
+        assert r.status_code == 200
+        assert r.json()["cron_expr"] == "0 12 * * *"
+
+    def test_patch_schedule_disable(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 * * * *", "is_enabled": True}, headers=auth_headers)
+        r = client.patch(f"/api/workflows/{wf_id}/schedule", json={"is_enabled": False}, headers=auth_headers)
+        assert r.status_code == 200
+        assert r.json()["is_enabled"] is False
+
+    def test_patch_schedule_not_found(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        r = client.patch(f"/api/workflows/{wf_id}/schedule", json={"is_enabled": False}, headers=auth_headers)
+        assert r.status_code == 404
+
+    def test_patch_schedule_rejects_invalid_cron(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 * * * *"}, headers=auth_headers)
+        r = client.patch(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "bad"}, headers=auth_headers)
+        assert r.status_code == 422
+
+    # --- API: delete ---
+
+    def test_delete_schedule(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        client.post(f"/api/workflows/{wf_id}/schedule", json={"cron_expr": "0 * * * *"}, headers=auth_headers)
+        r = client.delete(f"/api/workflows/{wf_id}/schedule", headers=auth_headers)
+        assert r.status_code == 204
+        r2 = client.get(f"/api/workflows/{wf_id}/schedule", headers=auth_headers)
+        assert r2.status_code == 404
+
+    def test_delete_schedule_not_found(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        r = client.delete(f"/api/workflows/{wf_id}/schedule", headers=auth_headers)
+        assert r.status_code == 404
+
+    def test_delete_schedule_requires_auth(self):
+        r = client.delete("/api/workflows/1/schedule")
+        assert r.status_code == 401
+
+    # --- disabled schedule has no next_run_at ---
+
+    def test_disabled_schedule_has_no_next_run(self, auth_headers, test_db):
+        wf_id = self._make_workflow(auth_headers)
+        r = client.post(f"/api/workflows/{wf_id}/schedule", json={
+            "cron_expr": "0 * * * *", "is_enabled": False
+        }, headers=auth_headers)
+        assert r.status_code == 201
+        assert r.json()["next_run_at"] is None

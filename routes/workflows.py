@@ -7,6 +7,7 @@ from utils.limiter import limiter
 from schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 from schemas.step import StepCreate, StepResponse
 from schemas.execution import ExecutionResult, ExecutionSummary
+from schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from routes.auth import oauth2_scheme
 from utils.security import require_role
 from services.auth_service import AuthService
@@ -304,3 +305,174 @@ async def list_runs(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Scheduling
+# ---------------------------------------------------------------------------
+
+@router.post("/{workflow_id}/schedule", response_model=ScheduleResponse, status_code=status.HTTP_201_CREATED)
+async def create_schedule(
+    workflow_id: int,
+    data: ScheduleCreate,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """
+    Set a cron schedule for a workflow. Replaces any existing schedule.
+    cron_expr is a standard 5-field cron string, e.g. '0 * * * *'.
+    """
+    user = await get_current_user_from_token(token)
+    workflow_service = WorkflowService()
+
+    try:
+        workflow_service.get_workflow_by_id(workflow_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+
+    from services.scheduler_service import validate_cron, add_or_replace_job, remove_job, _compute_next_run
+    from services.duckdb_service import DuckDBService
+
+    try:
+        validate_cron(data.cron_expr)
+    except ValidationException as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+
+    db = DuckDBService()
+    next_run = _compute_next_run(data.cron_expr) if data.is_enabled else None
+    existing = db.get_schedule_by_workflow(workflow_id)
+
+    if existing:
+        schedule = db.update_schedule(
+            workflow_id,
+            cron_expr=data.cron_expr,
+            is_enabled=data.is_enabled,
+            next_run_at=next_run,
+        )
+    else:
+        schedule = db.create_schedule(
+            workflow_id=workflow_id,
+            cron_expr=data.cron_expr,
+            is_enabled=data.is_enabled,
+            created_by=user.id,
+            next_run_at=next_run,
+        )
+
+    if data.is_enabled:
+        add_or_replace_job(workflow_id, data.cron_expr, user.id)
+    else:
+        remove_job(workflow_id)
+
+    audit_service = AuditService()
+    audit_service.log_action(
+        user_id=user.id,
+        action="schedule",
+        entity_type="workflow",
+        entity_id=workflow_id,
+        details=f"Set schedule '{data.cron_expr}' (enabled={data.is_enabled})"
+    )
+    return schedule
+
+
+@router.get("/{workflow_id}/schedule", response_model=ScheduleResponse)
+async def get_schedule(
+    workflow_id: int,
+    token: str = Depends(oauth2_scheme)
+):
+    """Get the current schedule for a workflow."""
+    await get_current_user_from_token(token)
+    workflow_service = WorkflowService()
+
+    try:
+        workflow_service.get_workflow_by_id(workflow_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+
+    from services.duckdb_service import DuckDBService
+    schedule = DuckDBService().get_schedule_by_workflow(workflow_id)
+    if not schedule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No schedule found for this workflow")
+    return schedule
+
+
+@router.patch("/{workflow_id}/schedule", response_model=ScheduleResponse)
+async def update_schedule(
+    workflow_id: int,
+    data: ScheduleUpdate,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Partially update a schedule (change cron expression or enable/disable)."""
+    user = await get_current_user_from_token(token)
+    workflow_service = WorkflowService()
+
+    try:
+        workflow_service.get_workflow_by_id(workflow_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+
+    from services.scheduler_service import validate_cron, add_or_replace_job, remove_job, _compute_next_run
+    from services.duckdb_service import DuckDBService
+
+    db = DuckDBService()
+    existing = db.get_schedule_by_workflow(workflow_id)
+    if not existing:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No schedule found for this workflow")
+
+    if data.cron_expr is not None:
+        try:
+            validate_cron(data.cron_expr)
+        except ValidationException as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+
+    new_cron = data.cron_expr if data.cron_expr is not None else existing.cron_expr
+    new_enabled = data.is_enabled if data.is_enabled is not None else existing.is_enabled
+    next_run = _compute_next_run(new_cron) if new_enabled else None
+
+    schedule = db.update_schedule(
+        workflow_id,
+        cron_expr=new_cron,
+        is_enabled=new_enabled,
+        next_run_at=next_run,
+    )
+
+    if new_enabled:
+        add_or_replace_job(workflow_id, new_cron, user.id)
+    else:
+        remove_job(workflow_id)
+
+    return schedule
+
+
+@router.delete("/{workflow_id}/schedule", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_schedule(
+    workflow_id: int,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Remove the schedule from a workflow."""
+    user = await get_current_user_from_token(token)
+    workflow_service = WorkflowService()
+
+    try:
+        workflow_service.get_workflow_by_id(workflow_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+
+    from services.scheduler_service import remove_job
+    from services.duckdb_service import DuckDBService
+
+    deleted = DuckDBService().delete_schedule(workflow_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No schedule found for this workflow")
+
+    remove_job(workflow_id)
+
+    AuditService().log_action(
+        user_id=user.id,
+        action="delete_schedule",
+        entity_type="workflow",
+        entity_id=workflow_id,
+        details=f"Removed schedule from workflow {workflow_id}"
+    )
+    return None

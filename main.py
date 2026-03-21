@@ -12,6 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from routes import auth, tables, workflows
 from services.duckdb_service import DuckDBService
+from services.scheduler_service import start_scheduler, stop_scheduler
 from utils.exceptions import FluxEngineException
 from utils.config import settings
 from utils.limiter import limiter
@@ -24,10 +25,14 @@ async def lifespan(app: FastAPI):
     db_service = DuckDBService()
     db_service.init_db()
     print("✓ Database initialized")
-    
+
+    start_scheduler()
+    print("✓ Scheduler started")
+
     yield
-    
+
     # Shutdown: Cleanup
+    stop_scheduler()
     print("✓ Application shutdown")
 
 

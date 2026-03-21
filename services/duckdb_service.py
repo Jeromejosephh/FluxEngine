@@ -10,6 +10,7 @@ from models.table import Table
 from models.workflow import Workflow
 from models.step import Step
 from models.execution import Execution
+from models.schedule import Schedule
 
 
 class DuckDBService:
@@ -190,6 +191,26 @@ class DuckDBService:
             )
         """)
 
+        # Schedules table
+        conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_schedules_id START 1
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS schedules (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_schedules_id'),
+                workflow_id INTEGER NOT NULL UNIQUE,
+                cron_expr VARCHAR NOT NULL,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_run_at TIMESTAMP,
+                next_run_at TIMESTAMP,
+                FOREIGN KEY (workflow_id) REFERENCES workflows(id),
+                FOREIGN KEY (created_by) REFERENCES users(id)
+            )
+        """)
+
         # Create indexes
         # Note: idx_workflows_status is intentionally omitted — DuckDB 0.10.0 has
         # an ART index bug where any UPDATE on an indexed column triggers a false
@@ -202,6 +223,7 @@ class DuckDBService:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_entries(user_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_entries(entity_type, entity_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_executions_workflow_id ON executions(workflow_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_schedules_workflow_id ON schedules(workflow_id)")
 
         # Unique index on table name (case-insensitive) for active tables only
         # Wrapped in try/except because DuckDB does not reliably honour
@@ -909,3 +931,98 @@ class DuckDBService:
             updated_at=row["updated_at"],
             is_active=row["is_active"]
         )
+
+    # ------------------------------------------------------------------
+    # Schedule methods
+    # ------------------------------------------------------------------
+
+    def _row_to_schedule(self, row: Dict[str, Any]) -> Schedule:
+        return Schedule(
+            id=row["id"],
+            workflow_id=row["workflow_id"],
+            cron_expr=row["cron_expr"],
+            is_enabled=row["is_enabled"],
+            created_by=row["created_by"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            last_run_at=row["last_run_at"],
+            next_run_at=row["next_run_at"],
+        )
+
+    def create_schedule(
+        self,
+        workflow_id: int,
+        cron_expr: str,
+        is_enabled: bool,
+        created_by: int,
+        next_run_at=None,
+    ) -> Schedule:
+        """Insert a new schedule row. One schedule per workflow (UNIQUE on workflow_id)."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        query = """
+            INSERT INTO schedules
+                (workflow_id, cron_expr, is_enabled, created_by, created_at, updated_at, next_run_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, workflow_id, cron_expr, is_enabled, created_by,
+                      created_at, updated_at, last_run_at, next_run_at
+        """
+        result = self.execute(query, (workflow_id, cron_expr, is_enabled, created_by, now, now, next_run_at))
+        return self._row_to_schedule(result[0])
+
+    def get_schedule_by_workflow(self, workflow_id: int) -> Optional[Schedule]:
+        """Return the schedule for a workflow, or None."""
+        result = self.execute(
+            "SELECT * FROM schedules WHERE workflow_id = ? LIMIT 1",
+            (workflow_id,)
+        )
+        return self._row_to_schedule(result[0]) if result else None
+
+    def get_all_enabled_schedules(self) -> List[Schedule]:
+        """Return all enabled schedules (used at startup to register jobs)."""
+        result = self.execute("SELECT * FROM schedules WHERE is_enabled = TRUE")
+        return [self._row_to_schedule(r) for r in result]
+
+    def update_schedule(
+        self,
+        workflow_id: int,
+        cron_expr: Optional[str] = None,
+        is_enabled: Optional[bool] = None,
+        next_run_at=None,
+    ) -> Optional[Schedule]:
+        """Partially update a schedule row. Returns None if not found."""
+        from datetime import datetime, timezone
+        existing = self.get_schedule_by_workflow(workflow_id)
+        if not existing:
+            return None
+
+        new_cron = cron_expr if cron_expr is not None else existing.cron_expr
+        new_enabled = is_enabled if is_enabled is not None else existing.is_enabled
+        new_next = next_run_at if next_run_at is not None else existing.next_run_at
+        now = datetime.now(timezone.utc)
+
+        self.execute(
+            """
+            UPDATE schedules
+            SET cron_expr = ?, is_enabled = ?, next_run_at = ?, updated_at = ?
+            WHERE workflow_id = ?
+            """,
+            (new_cron, new_enabled, new_next, now, workflow_id)
+        )
+        return self.get_schedule_by_workflow(workflow_id)
+
+    def update_schedule_last_run(self, workflow_id: int, last_run_at, next_run_at) -> None:
+        """Stamp last_run_at and next_run_at after a scheduled execution."""
+        from datetime import datetime, timezone
+        self.execute(
+            "UPDATE schedules SET last_run_at = ?, next_run_at = ?, updated_at = ? WHERE workflow_id = ?",
+            (last_run_at, next_run_at, datetime.now(timezone.utc), workflow_id)
+        )
+
+    def delete_schedule(self, workflow_id: int) -> bool:
+        """Delete a schedule row. Returns True if a row was deleted."""
+        existing = self.get_schedule_by_workflow(workflow_id)
+        if not existing:
+            return False
+        self.execute("DELETE FROM schedules WHERE workflow_id = ?", (workflow_id,))
+        return True

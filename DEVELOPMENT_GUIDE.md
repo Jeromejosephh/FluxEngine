@@ -1,6 +1,6 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-03-09 (All 93 tests passing — MVP Complete)
+**Last Updated:** 2026-03-21 (120/120 tests passing)
 **Project Status:** MVP Complete ✅
 **Current Phase:** Advanced Features + Production Readiness
 
@@ -127,8 +127,8 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ Real-time execution monitoring (`executions` table + `GET /api/workflows/{id}/runs`)
 - ✅ Execution records persist per-step metadata, row counts, success/error state
 - ✅ 28/28 workflow tests passing
-- ⏳ Action step type (webhook POST)
-- ⏳ Workflow scheduling (APScheduler)
+- ✅ Action step type (webhook POST — `urllib`, supports `headers` + `timeout_seconds`)
+- ✅ Workflow scheduling (APScheduler — cron-based, `schedules` table, `POST/GET/PATCH/DELETE /api/workflows/{id}/schedule`)
 - ✅ API rate limiting (slowapi — 10/minute on `/run`, shared limiter, disabled in tests)
 - ⏳ Caching layer
 - ⏳ Database backup/restore
@@ -216,8 +216,8 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Implement table row update endpoint (PUT /api/tables/{id}/data/{row_id})
 - [x] Implement table row delete endpoint (DELETE /api/tables/{id}/data/{row_id})
 - [x] Implement real-time monitoring (executions table + GET /api/workflows/{id}/runs)
-- [ ] Implement action step type (webhook POST)
-- [ ] Implement workflow scheduling (APScheduler)
+- [x] Implement action step type (webhook POST)
+- [x] Implement workflow scheduling (APScheduler)
 - [x] Add API rate limiting (slowapi — 10/minute on /run endpoint)
 - [ ] Create workflow templates
 - [ ] Add workflow analytics
@@ -248,7 +248,7 @@ Overall Project Completion: ~80% (MVP Complete)
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
-│ Stage 4: Advanced Features    ████░░░░░░  43% 🔄            │
+│ Stage 4: Advanced Features    ███████░░░  70% 🔄            │
 │ Stage 5: Production Readiness ████░░░░░░  40% 🔄            │
 └─────────────────────────────────────────────────────────────┘
 
@@ -280,11 +280,11 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ Per-step metadata persisted on every workflow run (no output bloat)
 
 ### In Progress
-- Stage 4: Advanced Features (row mutations, monitoring, rate limiting complete; action steps, scheduling pending)
+- Stage 4: Advanced Features (row mutations, monitoring, rate limiting, action steps, scheduling complete; templates, analytics, caching, backup pending)
 - Stage 5: Production Readiness (Docker done; CI/CD, test coverage, security audit pending)
 
 ### Recently Completed
-- ✅ All 93 tests passing (51 auth + 14 table + 28 workflow) — 100% pass rate
+- ✅ All 120 tests passing (51 auth + 14 table + 55 workflow) — 100% pass rate
 - ✅ Fixed RBAC: `require_admin`/`require_editor` made async, now correctly resolve user via FastAPI dependency injection
 - ✅ Fixed JWT timezone bug: test now uses `timezone.utc` on both sides
 - ✅ GitHub Actions CI — `.github/workflows/test.yml`, runs pytest on push/PR to main
@@ -325,17 +325,17 @@ All MVP items shipped. Next focus is post-MVP features.
 
 ### Post-MVP — Phase 4 Remainder
 
-2. **Notification / Action Steps**
-   - Implement `action` step type that POSTs results to a webhook URL
-   - Add webhook URL config to step config schema
+1. **Workflow Templates** — pre-built workflow definitions users can clone
+2. **Workflow Analytics** — aggregate run stats (success rate, avg duration, row counts)
+3. **Caching Layer** — optional Redis cache for query step results
+4. **Database Backup/Restore** — export/import DuckDB data
 
-3. **Workflow Scheduling**
-   - Trigger workflows on a cron schedule (e.g. APScheduler)
-   - Store schedule config on the workflow model
+### Post-MVP — Phase 5 (Production)
 
-4. **Testing & Quality**
-   - Achieve 70%+ test coverage
-   - Fix remaining auth test failures (RBAC fixture, JWT timing)
+1. **Test Coverage** — run `pytest --cov` and close gaps to >80%
+2. **Security Audit** — review auth, input validation, injection surface
+3. **Deployment Guide** — document production env setup, Docker + env vars
+4. **Performance Optimization** — profiling, query tuning
 
 ---
 
@@ -533,7 +533,7 @@ pytest tests/test_auth.py::TestPasswordHashing -v
 
 ### Workflow Tests (`tests/test_workflows.py`)
 
-**Status:** 28/28 tests passing (100% pass rate) ✅
+**Status:** 55/55 tests passing (100% pass rate) ✅
 
 **Test Categories:**
 - ✅ Workflow CRUD (8/8 tests)
@@ -541,6 +541,8 @@ pytest tests/test_auth.py::TestPasswordHashing -v
 - ✅ Table data insert/query (2/2 tests)
 - ✅ Workflow execution — query, transform, error cases (6/6 tests)
 - ✅ Execution history — persist, paginate, auth, 404 (8/8 tests)
+- ✅ Action steps — webhook POST, passthrough, errors, custom headers (9/9 tests)
+- ✅ Scheduling — cron CRUD, validation, enable/disable, auth (18/18 tests)
 
 ---
 
