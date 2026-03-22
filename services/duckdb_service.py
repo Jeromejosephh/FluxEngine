@@ -781,6 +781,48 @@ class DuckDBService:
         rows = self.execute(query, (workflow_id, limit, skip))
         return [Execution(**row) for row in rows] if rows else []
 
+    def get_workflow_analytics(self, workflow_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Return aggregated execution stats for a workflow.
+        Returns None if the workflow does not exist.
+        """
+        workflow = self.get_workflow_by_id(workflow_id)
+        if not workflow:
+            return None
+
+        row = self.execute("""
+            SELECT
+                COUNT(*)                                            AS total_runs,
+                SUM(CASE WHEN success THEN 1 ELSE 0 END)           AS successful_runs,
+                SUM(CASE WHEN NOT success THEN 1 ELSE 0 END)       AS failed_runs,
+                AVG(step_count)                                     AS avg_steps_per_run,
+                AVG(CASE WHEN success THEN final_output_count END)  AS avg_output_rows,
+                MIN(executed_at)                                    AS first_run_at,
+                MAX(executed_at)                                    AS last_run_at,
+                SUM(CASE WHEN executed_at >= CAST(CURRENT_TIMESTAMP AS TIMESTAMP) - INTERVAL 7 DAYS  THEN 1 ELSE 0 END) AS runs_last_7_days,
+                SUM(CASE WHEN executed_at >= CAST(CURRENT_TIMESTAMP AS TIMESTAMP) - INTERVAL 30 DAYS THEN 1 ELSE 0 END) AS runs_last_30_days
+            FROM executions
+            WHERE workflow_id = ?
+        """, (workflow_id,))[0]
+
+        total = row["total_runs"] or 0
+        successful = row["successful_runs"] or 0
+
+        return {
+            "workflow_id": workflow_id,
+            "workflow_name": workflow.name,
+            "total_runs": total,
+            "successful_runs": successful,
+            "failed_runs": row["failed_runs"] or 0,
+            "success_rate": round(successful / total, 4) if total > 0 else 0.0,
+            "avg_steps_per_run": round(float(row["avg_steps_per_run"] or 0), 2),
+            "avg_output_rows": round(float(row["avg_output_rows"] or 0), 2),
+            "first_run_at": row["first_run_at"],
+            "last_run_at": row["last_run_at"],
+            "runs_last_7_days": row["runs_last_7_days"] or 0,
+            "runs_last_30_days": row["runs_last_30_days"] or 0,
+        }
+
     # -------------------------------------------------------------------------
     # Workflow methods
     # -------------------------------------------------------------------------

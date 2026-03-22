@@ -1,6 +1,6 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-03-21 (120/120 tests passing)
+**Last Updated:** 2026-03-22 (138/138 tests passing)
 **Project Status:** MVP Complete ✅
 **Current Phase:** Advanced Features + Production Readiness
 
@@ -131,7 +131,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ Workflow scheduling (APScheduler — cron-based, `schedules` table, `POST/GET/PATCH/DELETE /api/workflows/{id}/schedule`)
 - ✅ API rate limiting (slowapi — 10/minute on `/run`, shared limiter, disabled in tests)
 - ⏳ Caching layer
-- ⏳ Database backup/restore
+- ✅ Database backup/restore (`GET /api/admin/backup`, `POST /api/admin/restore`, admin only)
 
 ---
 
@@ -220,9 +220,9 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Implement workflow scheduling (APScheduler)
 - [x] Add API rate limiting (slowapi — 10/minute on /run endpoint)
 - [ ] Create workflow templates
-- [ ] Add workflow analytics
+- [x] Add workflow analytics
 - [ ] Configure caching layer
-- [ ] Implement backup/restore
+- [x] Implement backup/restore
 
 ### Phase 5: Production
 - [x] Create Dockerfile
@@ -248,7 +248,7 @@ Overall Project Completion: ~80% (MVP Complete)
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
-│ Stage 4: Advanced Features    ███████░░░  70% 🔄            │
+│ Stage 4: Advanced Features    █████████░  90% 🔄            │
 │ Stage 5: Production Readiness ████░░░░░░  40% 🔄            │
 └─────────────────────────────────────────────────────────────┘
 
@@ -280,11 +280,11 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ Per-step metadata persisted on every workflow run (no output bloat)
 
 ### In Progress
-- Stage 4: Advanced Features (row mutations, monitoring, rate limiting, action steps, scheduling complete; templates, analytics, caching, backup pending)
+- Stage 4: Advanced Features (analytics, backup/restore, action steps, scheduling complete; templates remaining; caching deferred)
 - Stage 5: Production Readiness (Docker done; CI/CD, test coverage, security audit pending)
 
 ### Recently Completed
-- ✅ All 120 tests passing (51 auth + 14 table + 55 workflow) — 100% pass rate
+- ✅ All 138 tests passing (51 auth + 14 table + 55 workflow + 18 analytics/backup) — 100% pass rate
 - ✅ Fixed RBAC: `require_admin`/`require_editor` made async, now correctly resolve user via FastAPI dependency injection
 - ✅ Fixed JWT timezone bug: test now uses `timezone.utc` on both sides
 - ✅ GitHub Actions CI — `.github/workflows/test.yml`, runs pytest on push/PR to main
@@ -325,10 +325,10 @@ All MVP items shipped. Next focus is post-MVP features.
 
 ### Post-MVP — Phase 4 Remainder
 
-1. **Workflow Templates** — pre-built workflow definitions users can clone
-2. **Workflow Analytics** — aggregate run stats (success rate, avg duration, row counts)
-3. **Caching Layer** — optional Redis cache for query step results
-4. **Database Backup/Restore** — export/import DuckDB data
+1. **Workflow Templates** — pre-built workflow definitions users can clone (last remaining item)
+2. ~~Workflow Analytics~~ ✅
+3. **Caching Layer** — deferred (low ROI at current scale)
+4. ~~Database Backup/Restore~~ ✅
 
 ### Post-MVP — Phase 5 (Production)
 
