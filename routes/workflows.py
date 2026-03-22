@@ -8,6 +8,7 @@ from schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
 from schemas.step import StepCreate, StepResponse
 from schemas.execution import ExecutionResult, ExecutionSummary
 from schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
+from schemas.analytics import WorkflowAnalytics
 from routes.auth import oauth2_scheme
 from utils.security import require_role
 from services.auth_service import AuthService
@@ -263,6 +264,21 @@ async def run_workflow(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/{workflow_id}/analytics", response_model=WorkflowAnalytics)
+async def get_workflow_analytics(
+    workflow_id: int,
+    token: str = Depends(oauth2_scheme)
+):
+    """Return aggregated execution stats for a workflow."""
+    await get_current_user_from_token(token)
+    from services.duckdb_service import DuckDBService
+    db = DuckDBService()
+    analytics = db.get_workflow_analytics(workflow_id)
+    if analytics is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Workflow {workflow_id} not found")
+    return analytics
 
 
 @router.get("/{workflow_id}/runs", response_model=List[ExecutionSummary])
