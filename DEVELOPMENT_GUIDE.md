@@ -1,8 +1,8 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-03-22 (138/138 tests passing)
-**Project Status:** MVP Complete ✅
-**Current Phase:** Advanced Features + Production Readiness
+**Last Updated:** 2026-03-28 (170/170 tests passing)
+**Project Status:** MVP Complete ✅ — Stage 4 Complete ✅
+**Current Phase:** Production Readiness
 
 ---
 
@@ -107,7 +107,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 
 ---
 
-### Stage 4: Advanced Features 🔄 ~43% Complete
+### Stage 4: Advanced Features ✅ 100% Complete
 **Objective:** Add advanced capabilities for production readiness.
 
 **Components:**
@@ -130,8 +130,9 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ Action step type (webhook POST — `urllib`, supports `headers` + `timeout_seconds`)
 - ✅ Workflow scheduling (APScheduler — cron-based, `schedules` table, `POST/GET/PATCH/DELETE /api/workflows/{id}/schedule`)
 - ✅ API rate limiting (slowapi — 10/minute on `/run`, shared limiter, disabled in tests)
-- ⏳ Caching layer
+- ✅ Workflow templates (`GET/POST /api/templates/`, `GET/DELETE /api/templates/{id}`, `POST /api/templates/{id}/clone`)
 - ✅ Database backup/restore (`GET /api/admin/backup`, `POST /api/admin/restore`, admin only)
+- ~~Caching layer~~ — deferred (low ROI at current scale)
 
 ---
 
@@ -219,9 +220,8 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Implement action step type (webhook POST)
 - [x] Implement workflow scheduling (APScheduler)
 - [x] Add API rate limiting (slowapi — 10/minute on /run endpoint)
-- [ ] Create workflow templates
+- [x] Create workflow templates (`GET/POST /api/templates/`, clone, soft delete, step config validation)
 - [x] Add workflow analytics
-- [ ] Configure caching layer
 - [x] Implement backup/restore
 
 ### Phase 5: Production
@@ -242,13 +242,13 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 ## Progress Overview
 
 ```
-Overall Project Completion: ~80% (MVP Complete)
+Overall Project Completion: ~90%
 
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 1: Foundation           ██████████ 100% ✅            │
 │ Stage 2: Table Management     ██████████ 100% ✅            │
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
-│ Stage 4: Advanced Features    █████████░  90% 🔄            │
+│ Stage 4: Advanced Features    ██████████ 100% ✅            │
 │ Stage 5: Production Readiness ████░░░░░░  40% 🔄            │
 └─────────────────────────────────────────────────────────────┘
 
@@ -280,11 +280,13 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ Per-step metadata persisted on every workflow run (no output bloat)
 
 ### In Progress
-- Stage 4: Advanced Features (analytics, backup/restore, action steps, scheduling complete; templates remaining; caching deferred)
-- Stage 5: Production Readiness (Docker done; CI/CD, test coverage, security audit pending)
+- Stage 5: Production Readiness (Docker + CI/CD done; test coverage, security audit, deployment guide pending)
 
 ### Recently Completed
-- ✅ All 138 tests passing (51 auth + 14 table + 55 workflow + 18 analytics/backup) — 100% pass rate
+- ✅ All 170 tests passing (51 auth + 14 table + 55 workflow + 18 analytics/backup + 32 templates) — 100% pass rate
+- ✅ Workflow templates — `GET/POST /api/templates/`, `GET/DELETE /api/templates/{id}`, `POST /api/templates/{id}/clone`
+- ✅ Templates validate step configs at creation time (reuses StepService validation)
+- ✅ Clone endpoint creates workflow + all steps in one request (admin/editor)
 - ✅ Fixed RBAC: `require_admin`/`require_editor` made async, now correctly resolve user via FastAPI dependency injection
 - ✅ Fixed JWT timezone bug: test now uses `timezone.utc` on both sides
 - ✅ GitHub Actions CI — `.github/workflows/test.yml`, runs pytest on push/PR to main
@@ -323,14 +325,7 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 
 All MVP items shipped. Next focus is post-MVP features.
 
-### Post-MVP — Phase 4 Remainder
-
-1. **Workflow Templates** — pre-built workflow definitions users can clone (last remaining item)
-2. ~~Workflow Analytics~~ ✅
-3. **Caching Layer** — deferred (low ROI at current scale)
-4. ~~Database Backup/Restore~~ ✅
-
-### Post-MVP — Phase 5 (Production)
+### Stage 5 (Production)
 
 1. **Test Coverage** — run `pytest --cov` and close gaps to >80%
 2. **Security Audit** — review auth, input validation, injection surface
