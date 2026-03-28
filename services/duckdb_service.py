@@ -11,6 +11,7 @@ from models.workflow import Workflow
 from models.step import Step
 from models.execution import Execution
 from models.schedule import Schedule
+from models.template import WorkflowTemplate
 
 
 class DuckDBService:
@@ -211,6 +212,25 @@ class DuckDBService:
             )
         """)
 
+        # Workflow templates table
+        conn.execute("""
+            CREATE SEQUENCE IF NOT EXISTS seq_workflow_templates_id START 1
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS workflow_templates (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_workflow_templates_id'),
+                name VARCHAR NOT NULL,
+                description VARCHAR,
+                tags VARCHAR NOT NULL DEFAULT '[]',
+                step_configs VARCHAR NOT NULL,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                FOREIGN KEY (created_by) REFERENCES users(id)
+            )
+        """)
+
         # Create indexes
         # Note: idx_workflows_status is intentionally omitted — DuckDB 0.10.0 has
         # an ART index bug where any UPDATE on an indexed column triggers a false
@@ -224,6 +244,17 @@ class DuckDBService:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_entries(entity_type, entity_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_executions_workflow_id ON executions(workflow_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_schedules_workflow_id ON schedules(workflow_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_templates_created_by ON workflow_templates(created_by)")
+
+        # Unique index on template name (case-insensitive) for active templates only
+        try:
+            conn.execute("""
+                CREATE UNIQUE INDEX idx_templates_name_unique
+                ON workflow_templates(LOWER(name))
+                WHERE is_active = TRUE
+            """)
+        except Exception:
+            pass  # Index already exists — safe to continue
 
         # Unique index on table name (case-insensitive) for active tables only
         # Wrapped in try/except because DuckDB does not reliably honour
@@ -1068,3 +1099,71 @@ class DuckDBService:
             return False
         self.execute("DELETE FROM schedules WHERE workflow_id = ?", (workflow_id,))
         return True
+
+    # Workflow template methods
+
+    def _row_to_template(self, row: Dict[str, Any]) -> WorkflowTemplate:
+        return WorkflowTemplate(
+            id=row["id"],
+            name=row["name"],
+            description=row.get("description"),
+            tags=row["tags"],
+            step_configs=row["step_configs"],
+            created_by=row["created_by"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            is_active=row["is_active"],
+        )
+
+    def create_template(
+        self,
+        name: str,
+        description: Optional[str],
+        tags: str,
+        step_configs: str,
+        created_by: int,
+    ) -> WorkflowTemplate:
+        result = self.execute(
+            """
+            INSERT INTO workflow_templates
+                (name, description, tags, step_configs, created_by, created_at, updated_at, is_active)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE)
+            RETURNING id, name, description, tags, step_configs, created_by, created_at, updated_at, is_active
+            """,
+            (name, description, tags, step_configs, created_by),
+        )
+        if not result:
+            raise Exception("Failed to create workflow template")
+        return self._row_to_template(result[0])
+
+    def get_template_by_id(self, template_id: int) -> Optional[WorkflowTemplate]:
+        result = self.execute(
+            """
+            SELECT id, name, description, tags, step_configs, created_by, created_at, updated_at, is_active
+            FROM workflow_templates
+            WHERE id = ? AND is_active = TRUE
+            LIMIT 1
+            """,
+            (template_id,),
+        )
+        return self._row_to_template(result[0]) if result else None
+
+    def get_all_templates(self, skip: int = 0, limit: int = 100) -> List[WorkflowTemplate]:
+        result = self.execute(
+            """
+            SELECT id, name, description, tags, step_configs, created_by, created_at, updated_at, is_active
+            FROM workflow_templates
+            WHERE is_active = TRUE
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, skip),
+        )
+        return [self._row_to_template(r) for r in result]
+
+    def soft_delete_template(self, template_id: int) -> None:
+        from datetime import datetime, timezone
+        self.execute(
+            "UPDATE workflow_templates SET is_active = FALSE, updated_at = ? WHERE id = ?",
+            (datetime.now(timezone.utc), template_id),
+        )
