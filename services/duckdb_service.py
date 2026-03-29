@@ -256,17 +256,10 @@ class DuckDBService:
         except Exception:
             pass  # Index already exists — safe to continue
 
-        # Unique index on table name (case-insensitive) for active tables only
-        # Wrapped in try/except because DuckDB does not reliably honour
-        # IF NOT EXISTS for partial indexes across reconnects
-        try:
-            conn.execute("""
-                CREATE UNIQUE INDEX idx_tables_name_unique
-                ON tables(LOWER(name))
-                WHERE is_active = TRUE
-            """)
-        except Exception:
-            pass  # Index already exists — safe to continue
+        # Note: idx_tables_name_unique is intentionally omitted — DuckDB 0.10.0 has
+        # an ART index bug where any UPDATE on an indexed column triggers a false
+        # "Duplicate key" PK violation (same issue as idx_workflows_status).
+        # Uniqueness is enforced at the service level via validate_table_name().
 
         conn.commit()
     
