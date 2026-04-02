@@ -1,5 +1,5 @@
 """Authentication routes"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
 from schemas.user import UserCreate, UserResponse, UserLogin
@@ -7,29 +7,21 @@ from schemas.auth import Token
 from services.auth_service import AuthService
 from services.audit_service import AuditService
 from utils.exceptions import AuthenticationException
+from utils.limiter import limiter
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(user_data: UserCreate):
-    """
-    Register a new user
-    
-    TODO: 
-    - Add email verification
-    - Add rate limiting
-    - Add admin-only registration for admin role
-    """
+@limiter.limit("10/minute")
+async def register(request: Request, user_data: UserCreate):
+    """Register a new user"""
     auth_service = AuthService()
     audit_service = AuditService()
-    
+
     try:
-        # Create user
         user = auth_service.create_user(user_data)
-        
-        # Log audit entry
         audit_service.log_action(
             user_id=user.id,
             action="register",
@@ -37,37 +29,31 @@ async def register(user_data: UserCreate):
             entity_id=user.id,
             details=f"User registered: {user.email}"
         )
-        
         return user
-    
-    except Exception as e:
+
+    except ValueError:
+        # Email already exists — safe to surface
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail="A user with this email already exists"
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Registration failed"
         )
 
 
 @router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """
-    Login user and return JWT token
-    
-    TODO:
-    - Add brute force protection
-    - Add session management
-    - Add refresh token support
-    """
+@limiter.limit("10/minute")
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+    """Login user and return JWT token"""
     auth_service = AuthService()
     audit_service = AuditService()
-    
+
     try:
-        # Authenticate user
         token = auth_service.authenticate_user(form_data.username, form_data.password)
-        
-        # Get user for audit log
         user = auth_service.get_user_by_email(form_data.username)
-        
-        # Log audit entry
         audit_service.log_action(
             user_id=user.id if user else None,
             action="login",
@@ -75,9 +61,8 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             entity_id=user.id if user else None,
             details=f"User logged in: {form_data.username}"
         )
-        
         return token
-    
+
     except AuthenticationException as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
