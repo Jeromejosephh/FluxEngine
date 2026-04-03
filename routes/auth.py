@@ -32,7 +32,6 @@ async def register(request: Request, user_data: UserCreate):
         return user
 
     except ValueError:
-        # Email already exists — safe to surface
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user with this email already exists"

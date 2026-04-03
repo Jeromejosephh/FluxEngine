@@ -78,22 +78,18 @@ class StepService:
                     )
                 self._validate_webhook_headers(headers)
 
-    # Forbidden header names that could manipulate HTTP behaviour or auth
     _FORBIDDEN_HEADERS = {
         "authorization", "cookie", "host", "content-length",
         "transfer-encoding", "connection", "upgrade", "te",
     }
-    # Header names must be token chars only (RFC 7230)
     import re as _re
     _HEADER_NAME_RE = _re.compile(r'^[A-Za-z0-9\-]+$')
 
     def _validate_webhook_url_not_private(self, url: str) -> None:
-        """Reject URLs that resolve to private/loopback addresses (SSRF prevention)."""
         import ipaddress
         import urllib.parse
         parsed = urllib.parse.urlparse(url)
         host = parsed.hostname or ""
-        # Reject bare IP literals that are private/loopback
         try:
             addr = ipaddress.ip_address(host)
             if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
@@ -101,14 +97,12 @@ class StepService:
                     "Action step 'webhook_url' must not target a private or loopback address"
                 )
         except ValueError:
-            # host is a hostname — block obvious localhost variants
             if host.lower() in ("localhost", "localhost.localdomain"):
                 raise ValidationException(
                     "Action step 'webhook_url' must not target localhost"
                 )
 
     def _validate_webhook_headers(self, headers: dict) -> None:
-        """Reject forbidden or malformed header names."""
         for name in headers:
             if not isinstance(name, str) or not self._HEADER_NAME_RE.match(name):
                 raise ValidationException(
