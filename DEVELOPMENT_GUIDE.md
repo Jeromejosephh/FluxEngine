@@ -1,8 +1,8 @@
 # FluxEngine Development Guide
 
 **Last Updated:** 2026-04-03 (207/207 tests passing)
-**Project Status:** Complete ✅
-**Current Phase:** N/A — Ready for deployment
+**Project Status:** Backend Complete ✅ — Frontend in planning
+**Current Phase:** Stage 6 — Frontend (Next.js)
 
 ---
 
@@ -237,12 +237,24 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Deployment guide (DEPLOYMENT.md)
 - [x] Configure production environment (.env.example, docker-compose.yml)
 
+### Phase 6: Frontend
+- [ ] Init Next.js 14 project with App Router
+- [ ] Set up Tailwind + shadcn/ui
+- [ ] Add TanStack Query — wire up to FluxEngine API
+- [ ] Build sidebar layout (shared across all pages)
+- [ ] Tables page — list, create, spreadsheet view
+- [ ] Workflows page — list + IF/THEN builder
+- [ ] Logs page — execution history with expandable rows
+- [ ] Templates page — clone from prebuilt list
+- [ ] Settings page — account info
+- [ ] Deploy to Vercel
+
 ---
 
 ## Progress Overview
 
 ```
-Overall Project Completion: 100% ✅
+Overall Project Completion: 83%
 
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 1: Foundation           ██████████ 100% ✅            │
@@ -250,6 +262,7 @@ Overall Project Completion: 100% ✅
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
 │ Stage 4: Advanced Features    ██████████ 100% ✅            │
 │ Stage 5: Production Readiness ██████████ 100% ✅            │
+│ Stage 6: Frontend (Next.js)   ░░░░░░░░░░   0% ⏳            │
 └─────────────────────────────────────────────────────────────┘
 
 Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
@@ -316,13 +329,76 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 
 ## Next Actions
 
-### MVP Complete ✅
+### Backend Complete ✅
 
-All MVP items shipped. Next focus is post-MVP features.
+All backend stages shipped. Next focus is the frontend.
 
-### Project Complete ✅
+---
 
-All stages shipped. See `DEPLOYMENT.md` to go live.
+## Stage 6: Frontend (Next.js)
+
+### Stack
+- **Framework:** Next.js 14 (App Router)
+- **Styling:** Tailwind CSS
+- **Components:** shadcn/ui
+- **Forms:** React Hook Form
+- **Table logic:** TanStack Table
+- **API calls:** TanStack Query
+
+### App Structure
+```
+/app
+  /tables       → spreadsheet-style data view
+  /workflows    → IF/THEN workflow builder
+  /logs         → execution history, success/failure, payloads
+  /templates    → prebuilt workflows, clone in one click
+  /settings     → account, users
+```
+
+### Pages
+
+**Tables**
+- List all tables in sidebar
+- Open a table → spreadsheet grid (TanStack Table)
+- Add/edit/delete rows inline
+- Filter + sort columns
+- Create new table via form
+
+**Workflows**
+- List of workflow cards (name, status badge, last run time)
+- Click → open IF/THEN step builder
+  - Query step: pick table from dropdown
+  - Condition step: column / operator / value (dropdowns + input)
+  - Action step: paste webhook URL
+- Test run button — fires workflow and shows result inline
+- Schedule toggle (daily, hourly, custom cron)
+
+**Logs**
+- Table of every workflow run (newest first)
+- Columns: workflow name, ran at, success/fail, rows processed
+- Click a row → expand to see per-step output and payload
+- This is a key trust-building feature — ship it early
+
+**Templates**
+- Grid of prebuilt workflow cards
+- Clone button → creates a live workflow instantly
+- Growth engine for later — add more templates per niche
+
+### Deployment
+- Frontend → Vercel (free)
+- Backend → Railway or Render (already configured)
+
+### Checklist
+- [ ] Init Next.js 14 project with App Router
+- [ ] Set up Tailwind + shadcn/ui
+- [ ] Add TanStack Query — wire up to FluxEngine API
+- [ ] Build sidebar layout (shared across all pages)
+- [ ] Tables page — list, create, spreadsheet view
+- [ ] Workflows page — list + IF/THEN builder
+- [ ] Logs page — execution history with expandable rows
+- [ ] Templates page — clone from prebuilt list
+- [ ] Settings page — account info
+- [ ] Deploy to Vercel
 
 ---
 
