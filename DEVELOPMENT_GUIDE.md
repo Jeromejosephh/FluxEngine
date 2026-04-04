@@ -1,7 +1,7 @@
 # FluxEngine Development Guide
 
-**Last Updated:** 2026-04-03 (207/207 tests passing)
-**Project Status:** Backend Complete ✅ — Frontend in planning
+**Last Updated:** 2026-04-05 (207/207 tests passing)
+**Project Status:** Backend Complete ✅ — Frontend MVP shipped
 **Current Phase:** Stage 6 — Frontend (Next.js)
 
 ---
@@ -238,15 +238,17 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Configure production environment (.env.example, docker-compose.yml)
 
 ### Phase 6: Frontend
-- [ ] Init Next.js 14 project with App Router
-- [ ] Set up Tailwind + shadcn/ui
-- [ ] Add TanStack Query — wire up to FluxEngine API
-- [ ] Build sidebar layout (shared across all pages)
-- [ ] Tables page — list, create, spreadsheet view
-- [ ] Workflows page — list + IF/THEN builder
-- [ ] Logs page — execution history with expandable rows
-- [ ] Templates page — clone from prebuilt list
-- [ ] Settings page — account info
+- [x] Init Next.js 14 project with App Router
+- [x] Set up Tailwind + shadcn/ui
+- [x] Add TanStack Query — wire up to FluxEngine API
+- [x] Build sidebar layout (shared across all pages)
+- [x] Tables page — list, create, spreadsheet view, add rows
+- [x] Workflows page — list + IF/THEN builder, activate, run, view results
+- [x] Logs page — execution history with expandable step detail
+- [x] Templates page — list and clone
+- [x] Settings page — account info
+- [x] Polish — loading states, error messages, empty states
+- [x] Auth guard — redirect to /login if no token
 - [ ] Deploy to Vercel
 
 ---
@@ -254,7 +256,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 ## Progress Overview
 
 ```
-Overall Project Completion: 83%
+Overall Project Completion: 97%
 
 ┌─────────────────────────────────────────────────────────────┐
 │ Stage 1: Foundation           ██████████ 100% ✅            │
@@ -262,7 +264,7 @@ Overall Project Completion: 83%
 │ Stage 3: Workflow Engine      ██████████ 100% ✅            │
 │ Stage 4: Advanced Features    ██████████ 100% ✅            │
 │ Stage 5: Production Readiness ██████████ 100% ✅            │
-│ Stage 6: Frontend (Next.js)   ░░░░░░░░░░   0% ⏳            │
+│ Stage 6: Frontend (Next.js)   █████████░  90% 🔄            │
 └─────────────────────────────────────────────────────────────┘
 
 Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
