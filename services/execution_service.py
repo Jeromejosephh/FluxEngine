@@ -186,7 +186,7 @@ class ExecutionService:
         timeout = config.get("timeout_seconds", 30)
         extra_headers = config.get("headers", {})
 
-        payload = json.dumps(rows).encode("utf-8")
+        payload = json.dumps(rows, default=str).encode("utf-8")
         req = urllib.request.Request(
             webhook_url,
             data=payload,
