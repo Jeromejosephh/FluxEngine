@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 interface Workflow { id: number; name: string; }

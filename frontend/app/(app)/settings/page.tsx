@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getMe } from "@/lib/api";
+import { getMe } from "@/src/api";
 
 export default function SettingsPage() {
   const { data: user } = useQuery({

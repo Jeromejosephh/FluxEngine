@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 interface Template {
