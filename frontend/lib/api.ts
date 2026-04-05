@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://fluxengine-production.up.railway.app";
+const BASE_URL = "https://fluxengine-production.up.railway.app";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
