@@ -249,6 +249,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Settings page — account info
 - [x] Polish — loading states, error messages, empty states
 - [x] Auth guard — redirect to /login if no token
+- [x] Dark theme — VS Code colour scheme across all pages
 - [ ] Deploy to Vercel
 
 ---
