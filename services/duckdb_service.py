@@ -998,6 +998,14 @@ class DuckDBService:
             is_active=row["is_active"]
         )
 
+    def delete_step(self, step_id: int) -> bool:
+        """Soft-delete a step by ID. Returns True if deleted, False if not found."""
+        result = self.execute(
+            "UPDATE steps SET is_active = FALSE WHERE id = ? AND is_active = TRUE",
+            (step_id,)
+        )
+        return result is not None
+
     # ------------------------------------------------------------------
     # Schedule methods
     # ------------------------------------------------------------------

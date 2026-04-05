@@ -47,6 +47,11 @@ export default function WorkflowsPage() {
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
 
+  // Save as template
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateError, setTemplateError] = useState("");
+
   // Schedule
   const [showSchedule, setShowSchedule] = useState(false);
   const [cronExpr, setCronExpr] = useState("0 9 * * *");
@@ -135,6 +140,30 @@ export default function WorkflowsPage() {
     onError: (e: Error) => setStepError(e.message),
   });
 
+  const deleteStep = useMutation({
+    mutationFn: (stepId: number) => api.delete(`/api/workflows/${selected!.id}/steps/${stepId}/`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["steps", selected?.id] }),
+  });
+
+  const saveAsTemplate = useMutation({
+    mutationFn: () =>
+      api.post("/api/templates/", {
+        name: templateName,
+        description: selected!.description,
+        tags: [],
+        step_configs: steps.map((s) => ({
+          name: s.name, step_type: s.step_type, config: s.config, order: s.order,
+        })),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["templates"] });
+      setShowSaveTemplate(false);
+      setTemplateName("");
+      setTemplateError("");
+    },
+    onError: (e: Error) => setTemplateError(e.message),
+  });
+
   const runWorkflow = useMutation({
     mutationFn: () => api.post(`/api/workflows/${selected!.id}/run/`, {}),
     onSuccess: (res) => { setRunResult(res as Record<string, unknown>); setRunError(""); },
@@ -207,6 +236,18 @@ export default function WorkflowsPage() {
                 >
                   Edit
                 </button>
+                {steps.length > 0 && (
+                  <button
+                    onClick={() => {
+                      setTemplateName(selected.name);
+                      setTemplateError("");
+                      setShowSaveTemplate(true);
+                    }}
+                    className={btnSecondary}
+                  >
+                    Save as template
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     if (schedule) {
@@ -266,7 +307,13 @@ export default function WorkflowsPage() {
                       <span className={`text-xs px-2 py-0.5 rounded font-medium ${STEP_COLORS[step.step_type] ?? STEP_COLORS.transform}`}>
                         {step.step_type}
                       </span>
-                      <span className="text-sm text-[#d4d4d4] font-medium">{step.name}</span>
+                      <span className="text-sm text-[#d4d4d4] font-medium flex-1">{step.name}</span>
+                      <button
+                        onClick={() => deleteStep.mutate(step.id)}
+                        className="text-xs text-[#858585] hover:text-[#f14c4c]"
+                      >
+                        Delete
+                      </button>
                     </div>
                     <p className="text-xs text-[#4e4e4e] mt-1 ml-6 font-mono">
                       {JSON.stringify(step.config)}
@@ -370,6 +417,35 @@ export default function WorkflowsPage() {
                   {saveSchedule.isPending ? "Saving..." : "Save schedule"}
                 </button>
                 <button onClick={() => setShowSchedule(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save as template modal */}
+      {showSaveTemplate && selected && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-sm">
+            <h2 className="font-semibold text-[#d4d4d4] mb-1">Save as template</h2>
+            <p className="text-xs text-[#858585] mb-4">Saves this workflow's steps as a reusable template</p>
+            <div className="flex flex-col gap-3">
+              <input
+                placeholder="Template name"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                className={inputCls}
+              />
+              {templateError && <p className="text-sm text-[#f14c4c]">{templateError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => saveAsTemplate.mutate()}
+                  disabled={!templateName || saveAsTemplate.isPending}
+                  className={`flex-1 ${btnPrimary}`}
+                >
+                  {saveAsTemplate.isPending ? "Saving..." : "Save template"}
+                </button>
+                <button onClick={() => setShowSaveTemplate(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
               </div>
             </div>
           </div>

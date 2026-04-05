@@ -225,6 +225,24 @@ async def list_workflow_steps(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
+@router.delete("/{workflow_id}/steps/{step_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_workflow_step(
+    workflow_id: int,
+    step_id: int,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Delete a step from a workflow (requires admin or editor role)"""
+    await get_current_user_from_token(token)
+    step_service = StepService()
+    try:
+        step_service.delete_step(workflow_id, step_id)
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
 # ---------------------------------------------------------------------------
 # Execution
 # ---------------------------------------------------------------------------

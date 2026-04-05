@@ -152,3 +152,18 @@ class StepService:
         if not workflow:
             raise NotFoundException(f"Workflow with ID {workflow_id} not found")
         return self.db_service.get_steps_by_workflow(workflow_id)
+
+    def delete_step(self, workflow_id: int, step_id: int) -> None:
+        """
+        Delete a step from a workflow.
+
+        Raises:
+            NotFoundException: If the workflow or step does not exist.
+        """
+        workflow = self.db_service.get_workflow_by_id(workflow_id)
+        if not workflow:
+            raise NotFoundException(f"Workflow with ID {workflow_id} not found")
+        step = self.db_service.get_step_by_id(step_id)
+        if not step or step.workflow_id != workflow_id:
+            raise NotFoundException(f"Step with ID {step_id} not found in workflow {workflow_id}")
+        self.db_service.delete_step(step_id)

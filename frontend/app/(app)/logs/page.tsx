@@ -21,16 +21,14 @@ export default function LogsPage() {
 
   const { data: workflows = [], isLoading } = useQuery<Workflow[]>({
     queryKey: ["workflows"],
-    queryFn: () => api.get("/api/workflows"),
+    queryFn: () => api.get("/api/workflows/"),
   });
 
   const allRuns = useQuery<Run[]>({
     queryKey: ["allRuns", workflows.map((w) => w.id)],
     queryFn: async () => {
       const results = await Promise.all(
-        workflows.map((w) =>
-          api.get<{ runs: Run[] }>(`/api/workflows/${w.id}/runs`).then((r) => r.runs)
-        )
+        workflows.map((w) => api.get<Run[]>(`/api/workflows/${w.id}/runs/`))
       );
       return results.flat().sort((a, b) =>
         new Date(b.executed_at).getTime() - new Date(a.executed_at).getTime()
