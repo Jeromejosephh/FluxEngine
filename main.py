@@ -97,23 +97,6 @@ async def health_check():
     return {"status": "healthy", "service": "FluxEngine"}
 
 
-@app.post("/setup")
-async def setup():
-    """One-time setup endpoint — creates admin user if none exists"""
-    from services.auth_service import AuthService
-    from schemas.user import UserCreate
-    auth_service = AuthService()
-    existing = auth_service.get_user_by_email("admin@fluxengine.io")
-    if existing:
-        return {"message": "Admin already exists"}
-    user_data = UserCreate(
-        email="admin@fluxengine.io",
-        password="FluxAdmin2026!",
-        full_name="Admin",
-        role="admin"
-    )
-    auth_service.create_user(user_data)
-    return {"message": "Admin created", "email": "admin@fluxengine.io", "password": "FluxAdmin2026!"}
 
 
 # Register routers
