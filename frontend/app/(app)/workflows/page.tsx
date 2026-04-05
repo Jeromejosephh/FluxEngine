@@ -14,6 +14,7 @@ interface Step {
   config: Record<string, unknown>; order: number; workflow_id: number;
 }
 interface Table { id: number; name: string; }
+interface Schedule { cron_expr: string; is_enabled: boolean; next_run_at: string | null; }
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-[#37373d] text-[#858585]",
@@ -41,6 +42,18 @@ export default function WorkflowsPage() {
   const [runResult, setRunResult] = useState<Record<string, unknown> | null>(null);
   const [runError, setRunError] = useState("");
 
+  // Edit workflow
+  const [showEditWorkflow, setShowEditWorkflow] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+
+  // Schedule
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [cronExpr, setCronExpr] = useState("0 9 * * *");
+  const [scheduleEnabled, setScheduleEnabled] = useState(true);
+  const [scheduleError, setScheduleError] = useState("");
+
+  // Add step
   const [stepName, setStepName] = useState("");
   const [stepType, setStepType] = useState("query");
   const [stepTableId, setStepTableId] = useState("");
@@ -53,22 +66,29 @@ export default function WorkflowsPage() {
 
   const { data: workflows = [], isLoading, isError } = useQuery<Workflow[]>({
     queryKey: ["workflows"],
-    queryFn: () => api.get("/api/workflows"),
+    queryFn: () => api.get("/api/workflows/"),
   });
 
   const { data: steps = [] } = useQuery<Step[]>({
     queryKey: ["steps", selected?.id],
-    queryFn: () => api.get(`/api/workflows/${selected!.id}/steps`),
+    queryFn: () => api.get(`/api/workflows/${selected!.id}/steps/`),
     enabled: !!selected,
   });
 
   const { data: tables = [] } = useQuery<Table[]>({
     queryKey: ["tables"],
-    queryFn: () => api.get("/api/tables"),
+    queryFn: () => api.get("/api/tables/"),
+  });
+
+  const { data: schedule } = useQuery<Schedule>({
+    queryKey: ["schedule", selected?.id],
+    queryFn: () => api.get(`/api/workflows/${selected!.id}/schedule/`),
+    enabled: !!selected,
+    retry: false,
   });
 
   const createWorkflow = useMutation({
-    mutationFn: () => api.post("/api/workflows", { name: newName, description: newDesc }),
+    mutationFn: () => api.post("/api/workflows/", { name: newName, description: newDesc }),
     onSuccess: (w: unknown) => {
       qc.invalidateQueries({ queryKey: ["workflows"] });
       setSelected(w as Workflow);
@@ -76,17 +96,18 @@ export default function WorkflowsPage() {
     },
   });
 
-  const updateStatus = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      api.put(`/api/workflows/${id}`, { status }),
+  const updateWorkflow = useMutation({
+    mutationFn: (data: { name?: string; description?: string; status?: string }) =>
+      api.put(`/api/workflows/${selected!.id}/`, data),
     onSuccess: (updated: unknown) => {
       qc.invalidateQueries({ queryKey: ["workflows"] });
       setSelected(updated as Workflow);
+      setShowEditWorkflow(false);
     },
   });
 
   const deleteWorkflow = useMutation({
-    mutationFn: (id: number) => api.delete(`/api/workflows/${id}`),
+    mutationFn: (id: number) => api.delete(`/api/workflows/${id}/`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workflows"] });
       setSelected(null);
@@ -100,7 +121,7 @@ export default function WorkflowsPage() {
       if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
       if (stepType === "action") config = { webhook_url: stepWebhook };
       if (stepType === "transform") config = { select_columns: [] };
-      return api.post(`/api/workflows/${selected!.id}/steps`, {
+      return api.post(`/api/workflows/${selected!.id}/steps/`, {
         name: stepName, step_type: stepType,
         workflow_id: selected!.id, config, order: steps.length,
       });
@@ -115,9 +136,20 @@ export default function WorkflowsPage() {
   });
 
   const runWorkflow = useMutation({
-    mutationFn: () => api.post(`/api/workflows/${selected!.id}/run`, {}),
+    mutationFn: () => api.post(`/api/workflows/${selected!.id}/run/`, {}),
     onSuccess: (res) => { setRunResult(res as Record<string, unknown>); setRunError(""); },
     onError: (e: Error) => setRunError(e.message),
+  });
+
+  const saveSchedule = useMutation({
+    mutationFn: () =>
+      api.post(`/api/workflows/${selected!.id}/schedule/`, { cron_expr: cronExpr, is_enabled: scheduleEnabled }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["schedule", selected?.id] });
+      setShowSchedule(false);
+      setScheduleError("");
+    },
+    onError: (e: Error) => setScheduleError(e.message),
   });
 
   if (isLoading) return <LoadingSpinner />;
@@ -165,8 +197,30 @@ export default function WorkflowsPage() {
                 </span>
               </div>
               <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setEditName(selected.name);
+                    setEditDesc(selected.description ?? "");
+                    setShowEditWorkflow(true);
+                  }}
+                  className={btnSecondary}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    if (schedule) {
+                      setCronExpr(schedule.cron_expr);
+                      setScheduleEnabled(schedule.is_enabled);
+                    }
+                    setShowSchedule(true);
+                  }}
+                  className={btnSecondary}
+                >
+                  Schedule
+                </button>
                 {selected.status === "draft" && (
-                  <button onClick={() => updateStatus.mutate({ id: selected.id, status: "active" })} className={btnSecondary}>
+                  <button onClick={() => updateWorkflow.mutate({ status: "active" })} className={btnSecondary}>
                     Activate
                   </button>
                 )}
@@ -184,6 +238,19 @@ export default function WorkflowsPage() {
                 </button>
               </div>
             </div>
+
+            {/* Schedule info */}
+            {schedule && (
+              <div className="mb-4 px-3 py-2 rounded border border-[#3e3e42] bg-[#2d2d2d] flex items-center gap-3">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${schedule.is_enabled ? "bg-[#4ec9b0]" : "bg-[#858585]"}`} />
+                <span className="text-xs text-[#858585]">
+                  Schedule: <span className="font-mono text-[#d4d4d4]">{schedule.cron_expr}</span>
+                  {schedule.next_run_at && (
+                    <span className="ml-2">· Next: {new Date(schedule.next_run_at).toLocaleString()}</span>
+                  )}
+                </span>
+              </div>
+            )}
 
             {/* Steps */}
             <div className="mb-4">
@@ -242,6 +309,67 @@ export default function WorkflowsPage() {
               <div className="flex gap-2 pt-1">
                 <button onClick={() => createWorkflow.mutate()} disabled={!newName || createWorkflow.isPending} className={`flex-1 ${btnPrimary}`}>Create</button>
                 <button onClick={() => setShowCreate(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit workflow modal */}
+      {showEditWorkflow && selected && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-sm">
+            <h2 className="font-semibold text-[#d4d4d4] mb-4">Edit workflow</h2>
+            <div className="flex flex-col gap-3">
+              <input placeholder="Workflow name" value={editName} onChange={(e) => setEditName(e.target.value)} className={inputCls} />
+              <input placeholder="Description (optional)" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} className={inputCls} />
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => updateWorkflow.mutate({ name: editName, description: editDesc })}
+                  disabled={!editName || updateWorkflow.isPending}
+                  className={`flex-1 ${btnPrimary}`}
+                >
+                  Save
+                </button>
+                <button onClick={() => setShowEditWorkflow(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule modal */}
+      {showSchedule && selected && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-sm">
+            <h2 className="font-semibold text-[#d4d4d4] mb-1">Schedule workflow</h2>
+            <p className="text-xs text-[#858585] mb-4">Standard 5-field cron expression</p>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs text-[#858585] uppercase tracking-wide">Cron expression</label>
+                <input
+                  placeholder="0 9 * * *"
+                  value={cronExpr}
+                  onChange={(e) => setCronExpr(e.target.value)}
+                  className={`${inputCls} font-mono`}
+                />
+                <p className="text-xs text-[#4e4e4e]">e.g. <span className="font-mono">0 9 * * *</span> = daily at 9am · <span className="font-mono">0 9 * * 1</span> = Mondays at 9am</p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={scheduleEnabled}
+                  onChange={(e) => setScheduleEnabled(e.target.checked)}
+                  className="accent-[#007acc]"
+                />
+                <span className="text-sm text-[#d4d4d4]">Enabled</span>
+              </label>
+              {scheduleError && <p className="text-sm text-[#f14c4c]">{scheduleError}</p>}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => saveSchedule.mutate()} disabled={!cronExpr || saveSchedule.isPending} className={`flex-1 ${btnPrimary}`}>
+                  {saveSchedule.isPending ? "Saving..." : "Save schedule"}
+                </button>
+                <button onClick={() => setShowSchedule(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
               </div>
             </div>
           </div>

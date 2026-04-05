@@ -10,7 +10,7 @@ interface Table {
   id: number; name: string; description: string;
   schema_definition: { columns: Column[] }; created_at: string;
 }
-interface TableData { rows: Record<string, unknown>[]; total: number; }
+interface TableData { rows: Record<string, unknown>[]; count: number; }
 
 const COLUMN_TYPES = ["VARCHAR", "INTEGER", "FLOAT", "BOOLEAN", "DATE", "TIMESTAMP"];
 
@@ -21,28 +21,41 @@ const btnSecondary = "border border-[#3e3e42] rounded px-3 py-2 text-sm text-[#d
 export default function TablesPage() {
   const qc = useQueryClient();
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+
+  // Create table
   const [showCreate, setShowCreate] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [newTableDesc, setNewTableDesc] = useState("");
   const [columns, setColumns] = useState<Column[]>([{ name: "", type: "VARCHAR" }]);
-  const [newRow, setNewRow] = useState<Record<string, string>>({});
-  const [showAddRow, setShowAddRow] = useState(false);
   const [createError, setCreateError] = useState("");
+
+  // Edit table
+  const [showEditTable, setShowEditTable] = useState(false);
+  const [editTableName, setEditTableName] = useState("");
+  const [editTableDesc, setEditTableDesc] = useState("");
+
+  // Add row
+  const [showAddRow, setShowAddRow] = useState(false);
+  const [newRow, setNewRow] = useState<Record<string, string>>({});
+
+  // Edit row
+  const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null);
+  const [editRowData, setEditRowData] = useState<Record<string, string>>({});
 
   const { data: tables = [], isLoading, isError } = useQuery<Table[]>({
     queryKey: ["tables"],
-    queryFn: () => api.get("/api/tables"),
+    queryFn: () => api.get("/api/tables/"),
   });
 
   const { data: tableData } = useQuery<TableData>({
     queryKey: ["tableData", selectedTable?.id],
-    queryFn: () => api.get(`/api/tables/${selectedTable!.id}/data`),
+    queryFn: () => api.get(`/api/tables/${selectedTable!.id}/data/`),
     enabled: !!selectedTable,
   });
 
   const createTable = useMutation({
     mutationFn: () =>
-      api.post("/api/tables", {
+      api.post("/api/tables/", {
         name: newTableName,
         description: newTableDesc,
         schema_definition: { columns: columns.filter((c) => c.name) },
@@ -57,19 +70,45 @@ export default function TablesPage() {
     onError: (e: Error) => setCreateError(e.message),
   });
 
+  const editTable = useMutation({
+    mutationFn: () =>
+      api.put(`/api/tables/${selectedTable!.id}/`, { name: editTableName, description: editTableDesc }),
+    onSuccess: (updated: unknown) => {
+      qc.invalidateQueries({ queryKey: ["tables"] });
+      setSelectedTable(updated as Table);
+      setShowEditTable(false);
+    },
+  });
+
+  const deleteTable = useMutation({
+    mutationFn: (id: number) => api.delete(`/api/tables/${id}/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tables"] });
+      setSelectedTable(null);
+    },
+  });
+
   const addRow = useMutation({
-    mutationFn: () => api.post(`/api/tables/${selectedTable!.id}/data`, { rows: [newRow] }),
+    mutationFn: () => api.post(`/api/tables/${selectedTable!.id}/data/`, { rows: [newRow] }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tableData", selectedTable?.id] });
       setNewRow({}); setShowAddRow(false);
     },
   });
 
-  const deleteTable = useMutation({
-    mutationFn: (id: number) => api.delete(`/api/tables/${id}`),
+  const updateRow = useMutation({
+    mutationFn: (rowId: number) =>
+      api.put(`/api/tables/${selectedTable!.id}/data/${rowId}/`, { data: editRowData }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["tables"] });
-      setSelectedTable(null);
+      qc.invalidateQueries({ queryKey: ["tableData", selectedTable?.id] });
+      setEditingRow(null); setEditRowData({});
+    },
+  });
+
+  const deleteRow = useMutation({
+    mutationFn: (rowId: number) => api.delete(`/api/tables/${selectedTable!.id}/data/${rowId}/`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tableData", selectedTable?.id] });
     },
   });
 
@@ -123,6 +162,16 @@ export default function TablesPage() {
               <div className="flex gap-2">
                 <button onClick={() => setShowAddRow(true)} className={btnPrimary}>+ Add row</button>
                 <button
+                  onClick={() => {
+                    setEditTableName(selectedTable.name);
+                    setEditTableDesc(selectedTable.description ?? "");
+                    setShowEditTable(true);
+                  }}
+                  className={btnSecondary}
+                >
+                  Edit
+                </button>
+                <button
                   onClick={() => deleteTable.mutate(selectedTable.id)}
                   className="text-sm text-[#f14c4c] hover:text-red-400 px-3 py-2"
                 >
@@ -142,6 +191,7 @@ export default function TablesPage() {
                         <span className="ml-1 text-xs text-[#4e4e4e]">{c.type}</span>
                       </th>
                     ))}
+                    <th className="text-left px-3 py-2 text-[#858585] font-medium w-20">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -153,11 +203,32 @@ export default function TablesPage() {
                           {String(row[c.name] ?? "")}
                         </td>
                       ))}
+                      <td className="px-3 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingRow(row);
+                              const init: Record<string, string> = {};
+                              cols.forEach((c) => { init[c.name] = String(row[c.name] ?? ""); });
+                              setEditRowData(init);
+                            }}
+                            className="text-xs text-[#007acc] hover:text-[#4db8ff]"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteRow.mutate(row._row_id as number)}
+                            className="text-xs text-[#f14c4c] hover:text-red-400"
+                          >
+                            Del
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {rows.length === 0 && (
                     <tr>
-                      <td colSpan={cols.length + 1} className="px-3 py-8 text-center text-[#858585]">
+                      <td colSpan={cols.length + 2} className="px-3 py-8 text-center text-[#858585]">
                         No rows yet
                       </td>
                     </tr>
@@ -165,7 +236,7 @@ export default function TablesPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-xs text-[#858585] mt-2">{tableData?.total ?? 0} rows</p>
+            <p className="text-xs text-[#858585] mt-2">{tableData?.count ?? 0} rows</p>
           </div>
         )}
       </div>
@@ -226,6 +297,23 @@ export default function TablesPage() {
         </div>
       )}
 
+      {/* Edit table modal */}
+      {showEditTable && selectedTable && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-sm">
+            <h2 className="font-semibold text-[#d4d4d4] mb-4">Edit table</h2>
+            <div className="flex flex-col gap-3">
+              <input placeholder="Table name" value={editTableName} onChange={(e) => setEditTableName(e.target.value)} className={inputCls} />
+              <input placeholder="Description (optional)" value={editTableDesc} onChange={(e) => setEditTableDesc(e.target.value)} className={inputCls} />
+              <div className="flex gap-2 pt-2">
+                <button onClick={() => editTable.mutate()} disabled={!editTableName || editTable.isPending} className={`flex-1 ${btnPrimary}`}>Save</button>
+                <button onClick={() => setShowEditTable(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add row modal */}
       {showAddRow && selectedTable && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
@@ -248,6 +336,37 @@ export default function TablesPage() {
                   {addRow.isPending ? "Adding..." : "Add row"}
                 </button>
                 <button onClick={() => setShowAddRow(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit row modal */}
+      {editingRow && selectedTable && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-md">
+            <h2 className="font-semibold text-[#d4d4d4] mb-4">Edit row</h2>
+            <div className="flex flex-col gap-3">
+              {cols.map((col) => (
+                <div key={col.name} className="flex flex-col gap-1.5">
+                  <label className="text-xs text-[#858585] uppercase tracking-wide">{col.name}</label>
+                  <input
+                    value={editRowData[col.name] ?? ""}
+                    onChange={(e) => setEditRowData({ ...editRowData, [col.name]: e.target.value })}
+                    className={inputCls}
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => updateRow.mutate(editingRow._row_id as number)}
+                  disabled={updateRow.isPending}
+                  className={`flex-1 ${btnPrimary}`}
+                >
+                  {updateRow.isPending ? "Saving..." : "Save"}
+                </button>
+                <button onClick={() => setEditingRow(null)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
               </div>
             </div>
           </div>
