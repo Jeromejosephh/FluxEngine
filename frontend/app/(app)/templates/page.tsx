@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
-const FORM_BASE = "https://fluxengine-production.up.railway.app";
+const FORM_BASE = typeof window !== "undefined" ? window.location.origin : "";
 
 interface CatalogInput { key: string; label: string; type: string; placeholder: string; }
 interface CatalogTemplate { id: string; name: string; description: string; icon: string; inputs: CatalogInput[]; }
