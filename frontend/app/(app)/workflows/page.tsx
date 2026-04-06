@@ -15,6 +15,8 @@ interface Step {
 }
 interface Table { id: number; name: string; }
 interface Schedule { cron_expr: string; is_enabled: boolean; next_run_at: string | null; }
+interface StepResult { step_id: number; step_name: string; step_type: string; success: boolean; rows_out: number; error?: string; }
+interface RunResult { success: boolean; workflow_name: string; error?: string; steps: StepResult[]; }
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "bg-[#37373d] text-[#858585]",
@@ -26,7 +28,14 @@ const STEP_COLORS: Record<string, string> = {
   query: "bg-[#1e2a3a] text-[#569cd6]",
   condition: "bg-[#2a2a1e] text-[#dcdcaa]",
   action: "bg-[#2a1e3a] text-[#c586c0]",
-  transform: "bg-[#37373d] text-[#858585]",
+  transform: "bg-[#2a2a1e] text-[#dcdcaa]",
+};
+
+const STEP_LABELS: Record<string, string> = {
+  query: "GET",
+  transform: "IF",
+  condition: "IF",
+  action: "THEN",
 };
 
 const inputCls = "bg-[#3c3c3c] border border-[#3e3e42] rounded px-3 py-2 text-sm text-[#d4d4d4] focus:outline-none focus:border-[#007acc] placeholder-[#858585] w-full";
@@ -39,7 +48,7 @@ export default function WorkflowsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
-  const [runResult, setRunResult] = useState<Record<string, unknown> | null>(null);
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [runError, setRunError] = useState("");
 
   // Edit workflow
@@ -173,8 +182,8 @@ export default function WorkflowsPage() {
   });
 
   const runWorkflow = useMutation({
-    mutationFn: () => api.post(`/api/workflows/${selected!.id}/run/`, {}),
-    onSuccess: (res) => { setRunResult(res as Record<string, unknown>); setRunError(""); },
+    mutationFn: () => api.post<RunResult>(`/api/workflows/${selected!.id}/run/`, {}),
+    onSuccess: (res) => { setRunResult(res); setRunError(""); },
     onError: (e: Error) => setRunError(e.message),
   });
 
@@ -273,15 +282,13 @@ export default function WorkflowsPage() {
                     Activate
                   </button>
                 )}
-                {selected.status === "active" && (
-                  <button
-                    onClick={() => runWorkflow.mutate()}
-                    disabled={runWorkflow.isPending}
-                    className="bg-[#1e3a2f] text-[#4ec9b0] border border-[#2a5a3f] rounded px-3 py-1.5 text-sm font-medium hover:bg-[#2a5a3f] disabled:opacity-50 transition-colors"
-                  >
-                    {runWorkflow.isPending ? "Running..." : "▶ Run now"}
-                  </button>
-                )}
+                <button
+                  onClick={() => { setRunResult(null); setRunError(""); runWorkflow.mutate(); }}
+                  disabled={runWorkflow.isPending}
+                  className="bg-[#1e3a2f] text-[#4ec9b0] border border-[#2a5a3f] rounded px-3 py-1.5 text-sm font-medium hover:bg-[#2a5a3f] disabled:opacity-50 transition-colors"
+                >
+                  {runWorkflow.isPending ? "Running..." : selected.status === "active" ? "▶ Run now" : "▶ Run test"}
+                </button>
                 <button onClick={() => deleteWorkflow.mutate(selected.id)} className="text-sm text-[#f14c4c] hover:text-red-400 px-2 py-1.5">
                   Delete
                 </button>
@@ -313,7 +320,7 @@ export default function WorkflowsPage() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-[#4e4e4e] w-4">{i + 1}</span>
                       <span className={`text-xs px-2 py-0.5 rounded font-medium ${STEP_COLORS[step.step_type] ?? STEP_COLORS.transform}`}>
-                        {step.step_type}
+                        {STEP_LABELS[step.step_type] ?? step.step_type.toUpperCase()}
                       </span>
                       <span className="text-sm text-[#d4d4d4] font-medium flex-1">{step.name}</span>
                       <button
@@ -338,15 +345,29 @@ export default function WorkflowsPage() {
             {runError && <p className="text-sm text-[#f14c4c] mb-3">{runError}</p>}
             {runResult && (
               <div className="border border-[#3e3e42] rounded-lg p-4 bg-[#252526]">
-                <p className="text-sm font-medium text-[#d4d4d4] mb-2">
-                  Last run —{" "}
-                  <span className={runResult.success ? "text-[#4ec9b0]" : "text-[#f14c4c]"}>
-                    {runResult.success ? "Success" : "Failed"}
-                  </span>
-                </p>
-                <pre className="text-xs text-[#858585] font-mono overflow-auto whitespace-pre-wrap">
-                  {JSON.stringify(runResult, null, 2)}
-                </pre>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`w-2 h-2 rounded-full ${runResult.success ? "bg-[#4ec9b0]" : "bg-[#f14c4c]"}`} />
+                  <p className="text-sm font-medium text-[#d4d4d4]">
+                    {runResult.success ? "Run complete" : "Run failed"}
+                  </p>
+                  {runResult.error && <p className="text-xs text-[#f14c4c] ml-1">{runResult.error}</p>}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {runResult.steps.map((s, i) => (
+                    <div key={s.step_id} className="flex items-center gap-3 text-xs">
+                      <span className="text-[#4e4e4e] w-4 shrink-0">{i + 1}</span>
+                      <span className={`px-2 py-0.5 rounded font-medium shrink-0 ${STEP_COLORS[s.step_type] ?? STEP_COLORS.transform}`}>
+                        {STEP_LABELS[s.step_type] ?? s.step_type.toUpperCase()}
+                      </span>
+                      <span className="text-[#d4d4d4] flex-1">{s.step_name}</span>
+                      {s.success ? (
+                        <span className="text-[#858585]">{s.rows_out} row{s.rows_out !== 1 ? "s" : ""}</span>
+                      ) : (
+                        <span className="text-[#f14c4c] truncate max-w-50">{s.error}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -470,11 +491,11 @@ export default function WorkflowsPage() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs text-[#858585] uppercase tracking-wide">Type</label>
                 <select value={stepType} onChange={(e) => setStepType(e.target.value)} className={inputCls}>
-                  <option value="query">Query — fetch rows from a table</option>
-                  <option value="condition">Condition — filter rows by a rule</option>
-                  <option value="action">Action — send raw JSON to a webhook</option>
-                  <option value="notify">Notify — send formatted message (ntfy, Slack, etc.)</option>
-                  <option value="email">Email — send formatted email via Gmail</option>
+                  <option value="query">GET — fetch rows from a table</option>
+                  <option value="condition">IF — filter rows by a rule</option>
+                  <option value="action">THEN — send raw JSON to a webhook</option>
+                  <option value="notify">THEN — send formatted message (ntfy, Slack, etc.)</option>
+                  <option value="email">THEN — send formatted email</option>
                 </select>
               </div>
 

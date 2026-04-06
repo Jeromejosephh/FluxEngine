@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/src/utils";
 
 const links = [
+  { href: "/", label: "Dashboard", exact: true },
   { href: "/tables", label: "Tables" },
   { href: "/workflows", label: "Workflows" },
   { href: "/logs", label: "Logs" },
@@ -27,7 +28,7 @@ export function Sidebar() {
             href={link.href}
             className={cn(
               "px-3 py-1.5 rounded text-sm text-[#858585] hover:text-[#d4d4d4] hover:bg-[#37373d] transition-colors",
-              pathname.startsWith(link.href) &&
+              (link.exact ? pathname === link.href : pathname.startsWith(link.href)) &&
                 "bg-[#37373d] text-[#d4d4d4] border-l-2 border-[#007acc]"
             )}
           >

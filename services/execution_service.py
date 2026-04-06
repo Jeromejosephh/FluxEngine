@@ -36,12 +36,6 @@ class ExecutionService:
         if not workflow:
             raise NotFoundException(f"Workflow with ID {workflow_id} not found")
 
-        if workflow.status != "active":
-            raise ValidationException(
-                f"Workflow '{workflow.name}' is not active (status: {workflow.status}). "
-                "Set status to 'active' before running."
-            )
-
         steps = self.db_service.get_steps_by_workflow(workflow_id)
 
         step_results: List[StepResult] = []
