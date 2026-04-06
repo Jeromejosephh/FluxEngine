@@ -354,6 +354,12 @@ class ExecutionService:
     def _apply_op(cell_value: Any, op: str, target: Any) -> bool:
         """Evaluate a single filter condition."""
         try:
+            # Case-insensitive comparison for strings
+            if isinstance(cell_value, str) and isinstance(target, str):
+                if op == "eq":
+                    return cell_value.lower() == target.lower()
+                if op == "ne":
+                    return cell_value.lower() != target.lower()
             if op == "eq":
                 return cell_value == target
             if op == "ne":
