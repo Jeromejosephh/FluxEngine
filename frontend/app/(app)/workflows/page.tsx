@@ -126,14 +126,15 @@ export default function WorkflowsPage() {
   const addStep = useMutation({
     mutationFn: () => {
       let config: Record<string, unknown> = {};
+      let dbStepType = stepType;
       if (stepType === "query") config = { table_id: Number(stepTableId) };
       if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
       if (stepType === "action") config = { webhook_url: stepWebhook };
-      if (stepType === "notify") config = { webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate };
-      if (stepType === "email") config = { to: stepEmailTo, subject: stepEmailSubject, body_template: stepBodyTemplate };
+      if (stepType === "notify") { config = { subtype: "notify", webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate }; dbStepType = "action"; }
+      if (stepType === "email") { config = { subtype: "email", to: stepEmailTo, subject: stepEmailSubject, body_template: stepBodyTemplate }; dbStepType = "action"; }
       if (stepType === "transform") config = { select_columns: [] };
       return api.post(`/api/workflows/${selected!.id}/steps/`, {
-        name: stepName, step_type: stepType,
+        name: stepName, step_type: dbStepType,
         workflow_id: selected!.id, config, order: steps.length,
       });
     },

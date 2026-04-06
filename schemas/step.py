@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 class StepBase(BaseModel):
     """Base step schema"""
     name: str = Field(..., min_length=1, max_length=255)
-    step_type: str = Field(..., pattern="^(query|transform|condition|action|notify|email)$")
+    step_type: str = Field(..., pattern="^(query|transform|condition|action)$")
 
 
 class StepCreate(StepBase):
@@ -20,7 +20,7 @@ class StepCreate(StepBase):
 class StepUpdate(BaseModel):
     """Schema for updating a step"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
-    step_type: Optional[str] = Field(None, pattern="^(query|transform|condition|action|notify|email)$")
+    step_type: Optional[str] = Field(None, pattern="^(query|transform|condition|action)$")
     config: Optional[Dict[str, Any]] = None
     order: Optional[int] = Field(None, ge=0)
 

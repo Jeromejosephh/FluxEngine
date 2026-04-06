@@ -153,33 +153,6 @@ class DuckDBService:
             )
         """)
         
-        # Migration: remove CHECK constraint from step_type if it exists
-        try:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS steps_v2 (
-                    id INTEGER PRIMARY KEY DEFAULT nextval('seq_steps_id'),
-                    workflow_id INTEGER NOT NULL,
-                    name VARCHAR NOT NULL,
-                    step_type VARCHAR NOT NULL,
-                    config VARCHAR NOT NULL,
-                    "order" INTEGER NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    is_active BOOLEAN DEFAULT TRUE
-                )
-            """)
-            existing = conn.execute("SELECT COUNT(*) FROM steps_v2").fetchone()[0]
-            if existing == 0:
-                conn.execute("""
-                    INSERT INTO steps_v2
-                    SELECT id, workflow_id, name, step_type, config, "order", created_at, updated_at, is_active
-                    FROM steps
-                """)
-            conn.execute("ALTER TABLE steps RENAME TO steps_old")
-            conn.execute("ALTER TABLE steps_v2 RENAME TO steps")
-            conn.execute("DROP TABLE IF EXISTS steps_old")
-        except Exception:
-            pass
 
         # Audit entries table
         conn.execute("""

@@ -14,11 +14,9 @@ class StepService:
     # Required config keys per step type
     REQUIRED_CONFIG_KEYS = {
         "query": ["table_id"],
-        "transform": [],   # select_columns and/or filter are optional
+        "transform": [],
         "condition": [],
-        "action": ["webhook_url"],
-        "notify": ["webhook_url"],
-        "email": ["to"],
+        "action": [],
     }
 
     def __init__(self):
@@ -59,7 +57,7 @@ class StepService:
                         f"Transform filter op '{f['op']}' not supported. Use: {', '.join(sorted(allowed_ops))}"
                     )
 
-        if step_type == "action":
+        if step_type == "action" and not config.get("subtype"):
             webhook_url = config.get("webhook_url", "")
             if not isinstance(webhook_url, str) or not webhook_url.startswith(("http://", "https://")):
                 raise ValidationException(

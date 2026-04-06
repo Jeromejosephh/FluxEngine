@@ -78,16 +78,18 @@ class ExecutionService:
         """Dispatch a step to the correct handler."""
         try:
             config = json.loads(step.config)
+            subtype = config.get("subtype")
             if step.step_type == "query":
                 output = self._run_query_step(config)
             elif step.step_type == "transform":
                 output = self._run_transform_step(config, context_rows)
             elif step.step_type == "action":
-                output = self._run_action_step(config, context_rows)
-            elif step.step_type == "notify":
-                output = self._run_notify_step(config, context_rows)
-            elif step.step_type == "email":
-                output = self._run_email_step(config, context_rows)
+                if subtype == "email":
+                    output = self._run_email_step(config, context_rows)
+                elif subtype == "notify":
+                    output = self._run_notify_step(config, context_rows)
+                else:
+                    output = self._run_action_step(config, context_rows)
             else:
                 # condition — not yet implemented, pass through
                 output = context_rows
