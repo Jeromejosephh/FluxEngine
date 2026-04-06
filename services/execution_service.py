@@ -286,7 +286,7 @@ class ExecutionService:
         rows: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Email step — sends a formatted email via SMTP.
+        Email step — sends a formatted email via SendGrid HTTP API.
 
         Config shape:
           {
@@ -295,12 +295,10 @@ class ExecutionService:
             "body_template": "{company} | {role} | Due: {follow_up_date}"
           }
         """
-        import smtplib
-        from email.mime.text import MIMEText
         from utils.config import settings
 
-        if not settings.SMTP_EMAIL or not settings.SMTP_PASSWORD:
-            raise ValueError("SMTP credentials not configured. Set SMTP_EMAIL and SMTP_PASSWORD environment variables.")
+        if not settings.SENDGRID_API_KEY:
+            raise ValueError("SendGrid not configured. Set SENDGRID_API_KEY environment variable.")
 
         to = config["to"]
         subject = config.get("subject", "FluxEngine Notification")
@@ -324,15 +322,31 @@ class ExecutionService:
                 for row in rows
             )
 
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = settings.SMTP_EMAIL
-        msg["To"] = to
+        payload = json.dumps({
+            "personalizations": [{"to": [{"email": to}]}],
+            "from": {"email": settings.SENDGRID_FROM_EMAIL},
+            "subject": subject,
+            "content": [{"type": "text/plain", "value": body}]
+        }).encode("utf-8")
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.starttls()
-            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
-            server.sendmail(settings.SMTP_EMAIL, [to], msg.as_string())
+        req = urllib.request.Request(
+            "https://api.sendgrid.com/v3/mail/send",
+            data=payload,
+            method="POST",
+        )
+        req.add_header("Authorization", f"Bearer {settings.SENDGRID_API_KEY}")
+        req.add_header("Content-Type", "application/json")
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            raise ValueError(f"SendGrid email failed with HTTP {exc.code}: {exc.reason}")
+        except urllib.error.URLError as exc:
+            raise ValueError(f"SendGrid email failed: {exc.reason}")
+
+        if status >= 400:
+            raise ValueError(f"SendGrid email returned unexpected status {status}")
 
         return rows
 

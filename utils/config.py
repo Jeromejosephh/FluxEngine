@@ -29,11 +29,9 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
 
-    # SMTP settings
-    SMTP_EMAIL: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_HOST: str = "smtp.gmail.com"
-    SMTP_PORT: int = 587
+    # SendGrid settings
+    SENDGRID_API_KEY: str = ""
+    SENDGRID_FROM_EMAIL: str = "jeromejoseph311@gmail.com"
 
     class Config:
         env_file = ".env"
