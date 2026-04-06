@@ -84,6 +84,8 @@ class ExecutionService:
                 output = self._run_transform_step(config, context_rows)
             elif step.step_type == "action":
                 output = self._run_action_step(config, context_rows)
+            elif step.step_type == "notify":
+                output = self._run_notify_step(config, context_rows)
             else:
                 # condition — not yet implemented, pass through
                 output = context_rows
@@ -214,6 +216,65 @@ class ExecutionService:
             )
 
         return rows   # pass rows through to downstream steps
+
+    def _run_notify_step(
+        self,
+        config: Dict[str, Any],
+        rows: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Notify step — formats rows into a human-readable message and POSTs
+        to a webhook URL (designed for ntfy.sh but works with any plain-text webhook).
+
+        Config shape:
+          {
+            "webhook_url": "https://ntfy.sh/my-topic",
+            "title": "Follow-up Reminder",
+            "body_template": "{company} | {role} | Due: {follow_up_date}"
+          }
+
+        Each row is rendered using the body_template with {column} substitution.
+        Multiple rows are joined with newlines into a single notification.
+        """
+        webhook_url = config["webhook_url"]
+        title = config.get("title", "FluxEngine Notification")
+        body_template = config.get("body_template", "")
+
+        if not rows:
+            return rows
+
+        if body_template:
+            lines = []
+            for row in rows:
+                safe_row = {k: str(v) for k, v in row.items() if not k.startswith("_")}
+                try:
+                    lines.append(body_template.format(**safe_row))
+                except KeyError:
+                    lines.append(str(safe_row))
+            body = "\n".join(lines)
+        else:
+            body = "\n".join(
+                " | ".join(f"{k}: {v}" for k, v in row.items() if not k.startswith("_"))
+                for row in rows
+            )
+
+        payload = body.encode("utf-8")
+        req = urllib.request.Request(webhook_url, data=payload, method="POST")
+        req.add_header("Content-Type", "text/plain")
+        req.add_header("Title", title)
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                status = resp.status
+        except urllib.error.HTTPError as exc:
+            raise ValueError(f"Notify POST to {webhook_url} failed with HTTP {exc.code}: {exc.reason}")
+        except urllib.error.URLError as exc:
+            raise ValueError(f"Notify POST to {webhook_url} failed: {exc.reason}")
+
+        if status >= 400:
+            raise ValueError(f"Notify POST to {webhook_url} returned status {status}")
+
+        return rows
 
     @staticmethod
     def _apply_op(cell_value: Any, op: str, target: Any) -> bool:

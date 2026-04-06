@@ -17,6 +17,7 @@ class StepService:
         "transform": [],   # select_columns and/or filter are optional
         "condition": [],
         "action": ["webhook_url"],
+        "notify": ["webhook_url"],
     }
 
     def __init__(self):

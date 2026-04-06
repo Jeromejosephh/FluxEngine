@@ -66,6 +66,8 @@ export default function WorkflowsPage() {
   const [stepOp, setStepOp] = useState("eq");
   const [stepValue, setStepValue] = useState("");
   const [stepWebhook, setStepWebhook] = useState("");
+  const [stepTitle, setStepTitle] = useState("");
+  const [stepBodyTemplate, setStepBodyTemplate] = useState("");
   const [showAddStep, setShowAddStep] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -125,6 +127,7 @@ export default function WorkflowsPage() {
       if (stepType === "query") config = { table_id: Number(stepTableId) };
       if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
       if (stepType === "action") config = { webhook_url: stepWebhook };
+      if (stepType === "notify") config = { webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate };
       if (stepType === "transform") config = { select_columns: [] };
       return api.post(`/api/workflows/${selected!.id}/steps/`, {
         name: stepName, step_type: stepType,
@@ -135,7 +138,7 @@ export default function WorkflowsPage() {
       qc.invalidateQueries({ queryKey: ["steps", selected?.id] });
       setShowAddStep(false); setStepName(""); setStepType("query");
       setStepTableId(""); setStepColumn(""); setStepOp("eq");
-      setStepValue(""); setStepWebhook(""); setStepError("");
+      setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate(""); setStepError("");
     },
     onError: (e: Error) => setStepError(e.message),
   });
@@ -464,7 +467,8 @@ export default function WorkflowsPage() {
                 <select value={stepType} onChange={(e) => setStepType(e.target.value)} className={inputCls}>
                   <option value="query">Query — fetch rows from a table</option>
                   <option value="condition">Condition — filter rows by a rule</option>
-                  <option value="action">Action — fire a webhook</option>
+                  <option value="action">Action — send raw JSON to a webhook</option>
+                  <option value="notify">Notify — send formatted message (ntfy, Slack, etc.)</option>
                 </select>
               </div>
 
@@ -495,6 +499,29 @@ export default function WorkflowsPage() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs text-[#858585] uppercase tracking-wide">Webhook URL</label>
                   <input placeholder="https://..." value={stepWebhook} onChange={(e) => setStepWebhook(e.target.value)} className={inputCls} />
+                </div>
+              )}
+
+              {stepType === "notify" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-[#858585] uppercase tracking-wide">Webhook URL</label>
+                    <input placeholder="https://ntfy.sh/your-topic" value={stepWebhook} onChange={(e) => setStepWebhook(e.target.value)} className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-[#858585] uppercase tracking-wide">Notification title</label>
+                    <input placeholder="e.g. Follow-up Reminder" value={stepTitle} onChange={(e) => setStepTitle(e.target.value)} className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-[#858585] uppercase tracking-wide">Message template</label>
+                    <input
+                      placeholder="e.g. {company} | {role} | Due: {follow_up_date}"
+                      value={stepBodyTemplate}
+                      onChange={(e) => setStepBodyTemplate(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-[#4e4e4e]">Use {"{"} column_name {"}"} to insert values from each row</p>
+                  </div>
                 </div>
               )}
 
