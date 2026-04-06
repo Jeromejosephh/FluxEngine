@@ -260,9 +260,7 @@ class DuckDBService:
                 created_by INTEGER NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_triggered_at TIMESTAMP,
-                FOREIGN KEY (table_id) REFERENCES tables(id),
-                FOREIGN KEY (created_by) REFERENCES users(id)
+                last_triggered_at TIMESTAMP
             )
         """)
 
