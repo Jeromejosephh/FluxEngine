@@ -478,24 +478,33 @@ class DuckDBService:
             is_active=row['is_active']
         )
 
-    def get_table_by_name(self, name: str) -> Optional[Table]:
+    def get_table_by_name(self, name: str, user_id: Optional[int] = None) -> Optional[Table]:
         """
-        Get table by name (case-insensitive)
+        Get table by name (case-insensitive), optionally scoped to a user.
 
         Args:
             name: Table name
+            user_id: If provided, only match tables owned by this user
 
         Returns:
             Table object if found, None otherwise
         """
-        query = """
-            SELECT id, name, description, schema_definition, created_by, created_at, updated_at, is_active
-            FROM tables
-            WHERE LOWER(name) = LOWER(?) AND is_active = TRUE
-            LIMIT 1
-        """
-
-        result = self.execute(query, (name,))
+        if user_id is not None:
+            query = """
+                SELECT id, name, description, schema_definition, created_by, created_at, updated_at, is_active
+                FROM tables
+                WHERE LOWER(name) = LOWER(?) AND created_by = ? AND is_active = TRUE
+                LIMIT 1
+            """
+            result = self.execute(query, (name, user_id))
+        else:
+            query = """
+                SELECT id, name, description, schema_definition, created_by, created_at, updated_at, is_active
+                FROM tables
+                WHERE LOWER(name) = LOWER(?) AND is_active = TRUE
+                LIMIT 1
+            """
+            result = self.execute(query, (name,))
 
         if not result:
             return None

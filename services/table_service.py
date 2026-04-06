@@ -98,13 +98,14 @@ class TableService:
             if "primary_key" in column and not isinstance(column["primary_key"], bool):
                 raise ValidationException(f"Column '{col_name}' primary_key field must be boolean")
 
-    def validate_table_name(self, name: str, exclude_id: Optional[int] = None) -> None:
+    def validate_table_name(self, name: str, exclude_id: Optional[int] = None, user_id: Optional[int] = None) -> None:
         """
         Validate table name
 
         Args:
             name: Table name to validate
             exclude_id: Optional table ID to exclude from uniqueness check (for updates)
+            user_id: Scope uniqueness check to this user (two users may share a name)
 
         Raises:
             ValidationException: If name is invalid or already exists
@@ -123,8 +124,8 @@ class TableService:
                 f"and contain only letters, numbers, and underscores"
             )
 
-        # Check for duplicate table name (case-insensitive)
-        existing_table = self.db_service.get_table_by_name(name)
+        # Check for duplicate table name scoped to this user
+        existing_table = self.db_service.get_table_by_name(name, user_id=user_id)
         if existing_table:
             # If exclude_id is provided and matches, skip uniqueness check (update scenario)
             if exclude_id is None or existing_table.id != exclude_id:
@@ -145,8 +146,8 @@ class TableService:
             ValidationException: If validation fails
             DatabaseException: If database operation fails
         """
-        # Validate table name
-        self.validate_table_name(table_data.name)
+        # Validate table name (scoped to this user)
+        self.validate_table_name(table_data.name, user_id=user_id)
 
         # Validate schema definition
         self.validate_schema(table_data.schema_definition)
@@ -223,9 +224,9 @@ class TableService:
         # Verify table exists
         existing_table = self.get_table_by_id(table_id)
 
-        # Validate name if provided
+        # Validate name if provided (scoped to this user)
         if updates.name is not None:
-            self.validate_table_name(updates.name, exclude_id=table_id)
+            self.validate_table_name(updates.name, exclude_id=table_id, user_id=user_id)
 
         # Validate schema if provided
         if updates.schema_definition is not None:
