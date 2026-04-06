@@ -18,7 +18,7 @@ export default function LoginPage() {
     try {
       const { access_token } = await login(email, password);
       localStorage.setItem("token", access_token);
-      router.push("/");
+      router.push("/dashboard");
     } catch {
       setError("Invalid email or password");
     } finally {
