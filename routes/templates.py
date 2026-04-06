@@ -23,6 +23,12 @@ from catalog import CATALOG, CATALOG_BY_ID
 router = APIRouter()
 
 
+def _check_template_ownership(template, user):
+    """Raise 404 if editor tries to access another user's template."""
+    if user.role != "admin" and template.created_by != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+
+
 def _template_to_response(template) -> TemplateResponse:
     """Convert a WorkflowTemplate model to TemplateResponse."""
     return TemplateResponse(
@@ -189,7 +195,8 @@ async def list_templates(
 ):
     """List all available workflow templates."""
     service = TemplateService()
-    templates = service.get_all_templates(skip=skip, limit=limit)
+    owner_id = None if current_user.role == "admin" else current_user.id
+    templates = service.get_all_templates(skip=skip, limit=limit, user_id=owner_id)
     return [_template_to_response(t) for t in templates]
 
 
@@ -225,6 +232,7 @@ async def get_template(
     try:
         service = TemplateService()
         template = service.get_template_by_id(template_id)
+        _check_template_ownership(template, current_user)
         return _template_to_response(template)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
@@ -269,6 +277,7 @@ async def clone_template(
     try:
         template_service = TemplateService()
         template = template_service.get_template_by_id(template_id)
+        _check_template_ownership(template, current_user)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
 

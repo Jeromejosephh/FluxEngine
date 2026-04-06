@@ -45,9 +45,9 @@ class WorkflowService:
             raise NotFoundException(f"Workflow with ID {workflow_id} not found")
         return workflow
 
-    def get_all_workflows(self, skip: int = 0, limit: int = 100) -> List[Workflow]:
+    def get_all_workflows(self, skip: int = 0, limit: int = 100, user_id=None) -> List[Workflow]:
         """Return all active workflows with pagination."""
-        return self.db_service.get_all_workflows(skip=skip, limit=limit)
+        return self.db_service.get_all_workflows(skip=skip, limit=limit, user_id=user_id)
 
     def update_workflow(self, workflow_id: int, updates: WorkflowUpdate, user_id: int) -> Workflow:
         """

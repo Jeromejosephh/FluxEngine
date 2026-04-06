@@ -21,6 +21,13 @@ class RowsInsert(BaseModel):
 router = APIRouter()
 
 
+def _check_table_ownership(table, user):
+    """Raise 404 if editor tries to access another user's table."""
+    if user.role != "admin" and table.created_by != user.id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Table not found")
+
+
 async def get_current_user_from_token(token: str):
     """Helper to get current user from token"""
     auth_service = AuthService()
@@ -41,15 +48,12 @@ async def list_tables(
     token: str = Depends(oauth2_scheme)
 ):
     """List all tables with pagination"""
-    # Get current user (validates token)
     user = await get_current_user_from_token(token)
-
-    # Initialize service
     table_service = TableService()
 
     try:
-        # Get all tables
-        tables = table_service.get_all_tables(skip=skip, limit=limit)
+        owner_id = None if user.role == "admin" else user.id
+        tables = table_service.get_all_tables(skip=skip, limit=limit, user_id=owner_id)
 
         # Convert schema_definition from JSON string to dict for each table
         response_tables = []
@@ -90,6 +94,7 @@ async def get_table(
     try:
         # Get table
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
 
         # Convert schema_definition from JSON string to dict
         return TableResponse(
@@ -187,6 +192,8 @@ async def update_table(
     audit_service = AuditService()
 
     try:
+        existing = table_service.get_table_by_id(table_id)
+        _check_table_ownership(existing, user)
         # Update table
         table = table_service.update_table(table_id, table_data, user_id=user.id)
 
@@ -245,6 +252,7 @@ async def delete_table(
     try:
         # Get table name for audit before deletion
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
         table_name = table.name
 
         # Delete table
@@ -286,6 +294,7 @@ async def insert_rows(
 
     try:
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
         schema = json.loads(table.schema_definition)
         allowed_columns = {col["name"] for col in schema.get("columns", [])}
 
@@ -316,11 +325,12 @@ async def query_rows(
     token: str = Depends(oauth2_scheme)
 ):
     """Query all rows from a managed table"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     table_service = TableService()
 
     try:
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
         from services.duckdb_service import DuckDBService
         db = DuckDBService()
         rows = db.query_rows(table)
@@ -341,13 +351,14 @@ async def update_row(
     _: None = Depends(require_role(["admin", "editor"]))
 ):
     """Update a single row in a managed table (requires admin or editor role)"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     table_service = TableService()
 
     try:
         if not body.data:
             raise ValidationException("No fields provided to update")
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
         from services.duckdb_service import DuckDBService
         db = DuckDBService()
         db.update_row(table, row_id, body.data)
@@ -369,11 +380,12 @@ async def import_csv(
     _: None = Depends(require_role(["admin", "editor"]))
 ):
     """Import rows from a CSV file. Headers matched to table columns by name."""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     table_service = TableService()
 
     try:
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
         schema = json.loads(table.schema_definition)
         allowed_columns = {col["name"] for col in schema.get("columns", [])}
 
@@ -408,11 +420,12 @@ async def delete_row(
     _: None = Depends(require_role(["admin", "editor"]))
 ):
     """Delete a single row from a managed table (requires admin or editor role)"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     table_service = TableService()
 
     try:
         table = table_service.get_table_by_id(table_id)
+        _check_table_ownership(table, user)
         from services.duckdb_service import DuckDBService
         db = DuckDBService()
         db.delete_row(table, row_id)

@@ -190,18 +190,19 @@ class TableService:
 
         return table
 
-    def get_all_tables(self, skip: int = 0, limit: int = 100) -> List[Table]:
+    def get_all_tables(self, skip: int = 0, limit: int = 100, user_id=None) -> List[Table]:
         """
         Get all tables with pagination
 
         Args:
             skip: Number of records to skip
             limit: Maximum number of records to return
+            user_id: If provided, only return tables owned by this user
 
         Returns:
             List of Table objects
         """
-        return self.db_service.get_all_tables(skip=skip, limit=limit)
+        return self.db_service.get_all_tables(skip=skip, limit=limit, user_id=user_id)
 
     def update_table(self, table_id: int, updates: TableUpdate, user_id: int) -> Table:
         """

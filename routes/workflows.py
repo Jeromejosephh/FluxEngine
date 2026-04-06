@@ -21,6 +21,12 @@ from utils.exceptions import ValidationException, NotFoundException, DatabaseExc
 router = APIRouter()
 
 
+def _check_workflow_ownership(workflow, user):
+    """Raise 404 if editor tries to access another user's workflow."""
+    if user.role != "admin" and workflow.created_by != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+
+
 async def get_current_user_from_token(token: str):
     """Helper to get current user from token"""
     auth_service = AuthService()
@@ -60,10 +66,11 @@ async def list_workflows(
     token: str = Depends(oauth2_scheme)
 ):
     """List all workflows"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     workflow_service = WorkflowService()
     try:
-        return workflow_service.get_all_workflows(skip=skip, limit=limit)
+        owner_id = None if user.role == "admin" else user.id
+        return workflow_service.get_all_workflows(skip=skip, limit=limit, user_id=owner_id)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
@@ -74,10 +81,12 @@ async def get_workflow(
     token: str = Depends(oauth2_scheme)
 ):
     """Get workflow by ID"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     workflow_service = WorkflowService()
     try:
-        return workflow_service.get_workflow_by_id(workflow_id)
+        wf = workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(wf, user)
+        return wf
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
     except Exception as e:
@@ -126,6 +135,8 @@ async def update_workflow(
     audit_service = AuditService()
 
     try:
+        wf = workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(wf, user)
         workflow = workflow_service.update_workflow(workflow_id, workflow_data, user_id=user.id)
         audit_service.log_action(
             user_id=user.id,
@@ -156,6 +167,7 @@ async def delete_workflow(
 
     try:
         workflow = workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(workflow, user)
         workflow_service.delete_workflow(workflow_id, user_id=user.id)
         audit_service.log_action(
             user_id=user.id,
@@ -188,6 +200,7 @@ async def create_workflow_step(
     audit_service = AuditService()
 
     try:
+        _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
         step = step_service.create_step(workflow_id, step_data, user_id=user.id)
         audit_service.log_action(
             user_id=user.id,
@@ -213,10 +226,11 @@ async def list_workflow_steps(
     token: str = Depends(oauth2_scheme)
 ):
     """List all steps in a workflow ordered by execution order"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     step_service = StepService()
 
     try:
+        _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
         steps = step_service.get_steps_for_workflow(workflow_id)
         return [_step_to_response(s) for s in steps]
     except NotFoundException as e:
@@ -233,9 +247,10 @@ async def delete_workflow_step(
     _: None = Depends(require_role(["admin", "editor"]))
 ):
     """Delete a step from a workflow (requires admin or editor role)"""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     step_service = StepService()
     try:
+        _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
         step_service.delete_step(workflow_id, step_id)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
@@ -263,6 +278,7 @@ async def run_workflow(
     audit_service = AuditService()
 
     try:
+        _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
         result = execution_service.run_workflow(workflow_id, user_id=user.id)
 
         from services.duckdb_service import DuckDBService
@@ -290,7 +306,8 @@ async def get_workflow_analytics(
     token: str = Depends(oauth2_scheme)
 ):
     """Return aggregated execution stats for a workflow."""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
+    _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
     from services.duckdb_service import DuckDBService
     db = DuckDBService()
     analytics = db.get_workflow_analytics(workflow_id)
@@ -307,11 +324,11 @@ async def list_runs(
     token: str = Depends(oauth2_scheme)
 ):
     """List execution history for a workflow, newest first."""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     workflow_service = WorkflowService()
 
     try:
-        workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(workflow_service.get_workflow_by_id(workflow_id), user)
 
         import json
         from services.duckdb_service import DuckDBService
@@ -360,7 +377,7 @@ async def create_schedule(
     workflow_service = WorkflowService()
 
     try:
-        workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(workflow_service.get_workflow_by_id(workflow_id), user)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
 
@@ -414,11 +431,11 @@ async def get_schedule(
     token: str = Depends(oauth2_scheme)
 ):
     """Get the current schedule for a workflow."""
-    await get_current_user_from_token(token)
+    user = await get_current_user_from_token(token)
     workflow_service = WorkflowService()
 
     try:
-        workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(workflow_service.get_workflow_by_id(workflow_id), user)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
 
@@ -441,7 +458,7 @@ async def update_schedule(
     workflow_service = WorkflowService()
 
     try:
-        workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(workflow_service.get_workflow_by_id(workflow_id), user)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
 
@@ -489,7 +506,7 @@ async def delete_schedule(
     workflow_service = WorkflowService()
 
     try:
-        workflow_service.get_workflow_by_id(workflow_id)
+        _check_workflow_ownership(workflow_service.get_workflow_by_id(workflow_id), user)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
 

@@ -512,26 +512,36 @@ class DuckDBService:
             is_active=row['is_active']
         )
 
-    def get_all_tables(self, skip: int = 0, limit: int = 100) -> List[Table]:
+    def get_all_tables(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[Table]:
         """
         Get all active tables with pagination
 
         Args:
             skip: Number of records to skip
             limit: Maximum number of records to return
+            user_id: If provided, only return tables created by this user
 
         Returns:
             List of Table objects
         """
-        query = """
-            SELECT id, name, description, schema_definition, created_by, created_at, updated_at, is_active
-            FROM tables
-            WHERE is_active = TRUE
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-        """
-
-        result = self.execute(query, (limit, skip))
+        if user_id is not None:
+            query = """
+                SELECT id, name, description, schema_definition, created_by, created_at, updated_at, is_active
+                FROM tables
+                WHERE is_active = TRUE AND created_by = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """
+            result = self.execute(query, (user_id, limit, skip))
+        else:
+            query = """
+                SELECT id, name, description, schema_definition, created_by, created_at, updated_at, is_active
+                FROM tables
+                WHERE is_active = TRUE
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+            """
+            result = self.execute(query, (limit, skip))
 
         tables = []
         for row in result:
@@ -894,14 +904,18 @@ class DuckDBService:
             return None
         return Workflow(**result[0])
 
-    def get_all_workflows(self, skip: int = 0, limit: int = 100) -> List[Workflow]:
+    def get_all_workflows(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[Workflow]:
         """Get all active workflows with pagination."""
-        query = """
-            SELECT id, name, description, status, created_by, created_at, updated_at, is_active
-            FROM workflows WHERE is_active = TRUE
-            ORDER BY created_at DESC LIMIT ? OFFSET ?
-        """
-        result = self.execute(query, (limit, skip))
+        if user_id is not None:
+            result = self.execute(
+                "SELECT id, name, description, status, created_by, created_at, updated_at, is_active FROM workflows WHERE is_active = TRUE AND created_by = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (user_id, limit, skip)
+            )
+        else:
+            result = self.execute(
+                "SELECT id, name, description, status, created_by, created_at, updated_at, is_active FROM workflows WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, skip)
+            )
         return [Workflow(**row) for row in result]
 
     def update_workflow(
@@ -1168,17 +1182,17 @@ class DuckDBService:
         )
         return self._row_to_template(result[0]) if result else None
 
-    def get_all_templates(self, skip: int = 0, limit: int = 100) -> List[WorkflowTemplate]:
-        result = self.execute(
-            """
-            SELECT id, name, description, tags, step_configs, created_by, created_at, updated_at, is_active
-            FROM workflow_templates
-            WHERE is_active = TRUE
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-            """,
-            (limit, skip),
-        )
+    def get_all_templates(self, skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[WorkflowTemplate]:
+        if user_id is not None:
+            result = self.execute(
+                "SELECT id, name, description, tags, step_configs, created_by, created_at, updated_at, is_active FROM workflow_templates WHERE is_active = TRUE AND created_by = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (user_id, limit, skip),
+            )
+        else:
+            result = self.execute(
+                "SELECT id, name, description, tags, step_configs, created_by, created_at, updated_at, is_active FROM workflow_templates WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, skip),
+            )
         return [self._row_to_template(r) for r in result]
 
     def soft_delete_template(self, template_id: int) -> None:

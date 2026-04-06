@@ -61,9 +61,9 @@ class TemplateService:
             raise NotFoundException(f"Template with ID {template_id} not found")
         return template
 
-    def get_all_templates(self, skip: int = 0, limit: int = 100) -> List[WorkflowTemplate]:
+    def get_all_templates(self, skip: int = 0, limit: int = 100, user_id=None) -> List[WorkflowTemplate]:
         """Return all active templates with pagination."""
-        return self.db_service.get_all_templates(skip=skip, limit=limit)
+        return self.db_service.get_all_templates(skip=skip, limit=limit, user_id=user_id)
 
     def delete_template(self, template_id: int, user_id: int) -> None:
         """
