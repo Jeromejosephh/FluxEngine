@@ -79,3 +79,8 @@ class TemplateClone(BaseModel):
         if len(v) > 255:
             raise ValueError("name cannot exceed 255 characters")
         return v
+
+
+class CatalogActivate(BaseModel):
+    """Request body for activating a catalog template"""
+    inputs: Dict[str, str]  # e.g. {"email": "you@example.com"}
