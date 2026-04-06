@@ -39,6 +39,121 @@ def _template_to_response(template) -> TemplateResponse:
 
 
 # ---------------------------------------------------------------------------
+# Catalog: pre-built templates — must be registered BEFORE /{template_id}
+# ---------------------------------------------------------------------------
+
+@router.get("/catalog", response_model=List[Dict[str, Any]])
+async def list_catalog(
+    current_user: User = Depends(require_role(["admin", "editor"])),
+):
+    """Return the hardcoded product template catalog."""
+    return CATALOG
+
+
+@router.post("/catalog/{template_id}/activate", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
+async def activate_catalog_template(
+    template_id: str,
+    data: CatalogActivate,
+    current_user: User = Depends(require_role(["admin", "editor"])),
+):
+    """
+    Activate a catalog template for the current user.
+    Creates all required tables, the workflow, and its steps in one request.
+    Caller supplies values for each template input (e.g. {"email": "you@example.com"}).
+    """
+    tmpl = CATALOG_BY_ID.get(template_id)
+    if not tmpl:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Catalog template '{template_id}' not found")
+
+    # Validate required inputs
+    for inp in tmpl.get("inputs", []):
+        key = inp["key"]
+        if key not in data.inputs or not data.inputs[key].strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Missing required input: '{inp['label']}'",
+            )
+
+    table_service = TableService()
+    db = DuckDBService()
+
+    # Create tables and track key → id mapping
+    table_map: Dict[str, int] = {}
+    for tbl_def in tmpl.get("tables", []):
+        try:
+            table = table_service.create_table(
+                TableCreate(
+                    name=tbl_def["name"],
+                    description=tbl_def.get("description"),
+                    schema_definition={"columns": tbl_def["columns"]},
+                ),
+                user_id=current_user.id,
+            )
+            db.ensure_physical_table(table)
+            table_map[tbl_def["key"]] = table.id
+        except ValidationException as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    # Create the workflow (status = active so it can run immediately)
+    wf_def = tmpl["workflow"]
+    try:
+        workflow = db.create_workflow(
+            name=wf_def["name"],
+            description=wf_def.get("description"),
+            status="active",
+            created_by=current_user.id,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    # Create steps, substituting {table_key} and {input_key} placeholders
+    def _substitute(obj: Any) -> Any:
+        if isinstance(obj, str) and obj.startswith("{") and obj.endswith("}"):
+            key = obj[1:-1]
+            if key in table_map:
+                return table_map[key]
+            if key in data.inputs:
+                return data.inputs[key]
+        elif isinstance(obj, dict):
+            return {k: _substitute(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [_substitute(item) for item in obj]
+        return obj
+
+    step_service = StepService()
+    for step_def in wf_def.get("steps", []):
+        resolved_config = _substitute(step_def["config"])
+        try:
+            step_service.create_step(
+                workflow_id=workflow.id,
+                data=StepCreate(
+                    workflow_id=workflow.id,
+                    name=step_def["name"],
+                    step_type=step_def["step_type"],
+                    config=resolved_config,
+                    order=step_def["order"],
+                ),
+                user_id=current_user.id,
+            )
+        except ValidationException as e:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+    AuditService().log_action(
+        user_id=current_user.id,
+        action="activate_catalog_template",
+        entity_type="workflow",
+        entity_id=workflow.id,
+        details=f"Activated catalog template '{template_id}' → workflow '{workflow.name}' (ID {workflow.id})",
+    )
+
+    return workflow
+
+
+# ---------------------------------------------------------------------------
 # Template CRUD
 # ---------------------------------------------------------------------------
 
@@ -177,121 +292,6 @@ async def clone_template(
         entity_type="workflow_template",
         entity_id=template_id,
         details=f"Cloned template '{template.name}' → workflow '{workflow.name}' (ID {workflow.id})",
-    )
-
-    return workflow
-
-
-# ---------------------------------------------------------------------------
-# Catalog: pre-built templates that create tables + workflow in one shot
-# ---------------------------------------------------------------------------
-
-@router.get("/catalog", response_model=List[Dict[str, Any]])
-async def list_catalog(
-    current_user: User = Depends(require_role(["admin", "editor"])),
-):
-    """Return the hardcoded product template catalog."""
-    return CATALOG
-
-
-@router.post("/catalog/{template_id}/activate", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
-async def activate_catalog_template(
-    template_id: str,
-    data: CatalogActivate,
-    current_user: User = Depends(require_role(["admin", "editor"])),
-):
-    """
-    Activate a catalog template for the current user.
-    Creates all required tables, the workflow, and its steps in one request.
-    Caller supplies values for each template input (e.g. {"email": "you@example.com"}).
-    """
-    tmpl = CATALOG_BY_ID.get(template_id)
-    if not tmpl:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Catalog template '{template_id}' not found")
-
-    # Validate required inputs
-    for inp in tmpl.get("inputs", []):
-        key = inp["key"]
-        if key not in data.inputs or not data.inputs[key].strip():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Missing required input: '{inp['label']}'",
-            )
-
-    table_service = TableService()
-    db = DuckDBService()
-
-    # Create tables and track key → id mapping
-    table_map: Dict[str, int] = {}
-    for tbl_def in tmpl.get("tables", []):
-        try:
-            table = table_service.create_table(
-                TableCreate(
-                    name=tbl_def["name"],
-                    description=tbl_def.get("description"),
-                    schema_definition={"columns": tbl_def["columns"]},
-                ),
-                user_id=current_user.id,
-            )
-            db.ensure_physical_table(table)
-            table_map[tbl_def["key"]] = table.id
-        except ValidationException as e:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-    # Create the workflow (status = active so it can run immediately)
-    wf_def = tmpl["workflow"]
-    try:
-        workflow = db.create_workflow(
-            name=wf_def["name"],
-            description=wf_def.get("description"),
-            status="active",
-            created_by=current_user.id,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-    # Create steps, substituting {table_key} and {input_key} placeholders
-    def _substitute(obj: Any) -> Any:
-        if isinstance(obj, str) and obj.startswith("{") and obj.endswith("}"):
-            key = obj[1:-1]
-            if key in table_map:
-                return table_map[key]
-            if key in data.inputs:
-                return data.inputs[key]
-        elif isinstance(obj, dict):
-            return {k: _substitute(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [_substitute(item) for item in obj]
-        return obj
-
-    step_service = StepService()
-    for step_def in wf_def.get("steps", []):
-        resolved_config = _substitute(step_def["config"])
-        try:
-            step_service.create_step(
-                workflow_id=workflow.id,
-                data=StepCreate(
-                    workflow_id=workflow.id,
-                    name=step_def["name"],
-                    step_type=step_def["step_type"],
-                    config=resolved_config,
-                    order=step_def["order"],
-                ),
-                user_id=current_user.id,
-            )
-        except ValidationException as e:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-
-    AuditService().log_action(
-        user_id=current_user.id,
-        action="activate_catalog_template",
-        entity_type="workflow",
-        entity_id=workflow.id,
-        details=f"Activated catalog template '{template_id}' → workflow '{workflow.name}' (ID {workflow.id})",
     )
 
     return workflow
