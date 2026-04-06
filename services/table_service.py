@@ -19,7 +19,7 @@ class TableService:
 
     # Reserved system table names
     RESERVED_NAMES = {
-        'users', 'workflows', 'steps', 'tables', 'audit_entries'
+        'users', 'workflows', 'steps', 'tables', 'audit_entries', 'inbound_webhooks'
     }
 
     def __init__(self):

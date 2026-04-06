@@ -11,6 +11,11 @@ interface Table {
   schema_definition: { columns: Column[] }; created_at: string;
 }
 interface TableData { rows: Record<string, unknown>[]; count: number; }
+interface InboundWebhook {
+  id: number; table_id: number; token: string; is_enabled: boolean;
+  description: string | null; trigger_workflow_id: number | null;
+  last_triggered_at: string | null;
+}
 
 const COLUMN_TYPES = ["VARCHAR", "INTEGER", "FLOAT", "BOOLEAN", "DATE", "TIMESTAMP"];
 
@@ -33,6 +38,10 @@ export default function TablesPage() {
   const [showEditTable, setShowEditTable] = useState(false);
   const [editTableName, setEditTableName] = useState("");
   const [editTableDesc, setEditTableDesc] = useState("");
+
+  // Inbound webhook
+  const [showWebhook, setShowWebhook] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Add row
   const [showAddRow, setShowAddRow] = useState(false);
@@ -112,6 +121,32 @@ export default function TablesPage() {
     },
   });
 
+  const { data: webhook, refetch: refetchWebhook } = useQuery<InboundWebhook>({
+    queryKey: ["webhook", selectedTable?.id],
+    queryFn: () => api.get(`/api/webhooks/tables/${selectedTable!.id}/`),
+    enabled: !!selectedTable && showWebhook,
+    retry: false,
+  });
+
+  const createWebhook = useMutation({
+    mutationFn: () => api.post(`/api/webhooks/tables/${selectedTable!.id}/`, {}),
+    onSuccess: () => refetchWebhook(),
+  });
+
+  const deleteWebhook = useMutation({
+    mutationFn: () => api.delete(`/api/webhooks/tables/${selectedTable!.id}/`),
+    onSuccess: () => refetchWebhook(),
+  });
+
+  const rotateToken = useMutation({
+    mutationFn: () => api.post(`/api/webhooks/tables/${selectedTable!.id}/rotate/`, {}),
+    onSuccess: () => refetchWebhook(),
+  });
+
+  const webhookUrl = webhook
+    ? `https://fluxengine-production.up.railway.app/webhooks/inbound/${webhook.token}`
+    : null;
+
   const cols = selectedTable?.schema_definition?.columns ?? [];
   const rows = tableData?.rows ?? [];
 
@@ -161,6 +196,7 @@ export default function TablesPage() {
               </div>
               <div className="flex gap-2">
                 <button onClick={() => setShowAddRow(true)} className={btnPrimary}>+ Add row</button>
+                <button onClick={() => setShowWebhook(true)} className={btnSecondary}>Webhook</button>
                 <button
                   onClick={() => {
                     setEditTableName(selectedTable.name);
@@ -200,7 +236,9 @@ export default function TablesPage() {
                       <td className="px-3 py-2 text-[#4e4e4e]">{i + 1}</td>
                       {cols.map((c) => (
                         <td key={c.name} className="px-3 py-2 text-[#d4d4d4]">
-                          {String(row[c.name] ?? "")}
+                          {(c.type === "DATE" || c.type === "TIMESTAMP") && row[c.name]
+                            ? String(row[c.name]).split("T")[0].split("-").reverse().join("-")
+                            : String(row[c.name] ?? "")}
                         </td>
                       ))}
                       <td className="px-3 py-2">
@@ -338,6 +376,78 @@ export default function TablesPage() {
                 <button onClick={() => setShowAddRow(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inbound webhook modal */}
+      {showWebhook && selectedTable && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-[#d4d4d4]">Inbound webhook</h2>
+              <button onClick={() => setShowWebhook(false)} className="text-[#858585] hover:text-[#d4d4d4] text-sm">✕</button>
+            </div>
+            {!webhook ? (
+              <div className="flex flex-col gap-3">
+                <p className="text-sm text-[#858585]">No webhook yet. Generate a URL to let external services push data into this table.</p>
+                <button
+                  onClick={() => createWebhook.mutate()}
+                  disabled={createWebhook.isPending}
+                  className={btnPrimary}
+                >
+                  {createWebhook.isPending ? "Generating..." : "Generate webhook URL"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-xs text-[#858585] uppercase tracking-wide mb-1.5">Webhook URL</p>
+                  <div className="flex gap-2">
+                    <input
+                      readOnly
+                      value={webhookUrl ?? ""}
+                      className="flex-1 bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-2 text-xs text-[#4ec9b0] font-mono focus:outline-none"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(webhookUrl ?? "");
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className={btnSecondary}
+                    >
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs text-[#858585] bg-[#2d2d2d] rounded p-3">
+                  <p className="mb-1">POST JSON to this URL — no auth required. Example:</p>
+                  <pre className="font-mono text-[#858585] whitespace-pre-wrap">{`curl -X POST "${webhookUrl}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"${cols[0]?.name ?? "field"}": "value"}'`}</pre>
+                </div>
+                {webhook.last_triggered_at && (
+                  <p className="text-xs text-[#858585]">Last received: {new Date(webhook.last_triggered_at).toLocaleString()}</p>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => rotateToken.mutate()}
+                    disabled={rotateToken.isPending}
+                    className={btnSecondary}
+                  >
+                    {rotateToken.isPending ? "Rotating..." : "Rotate token"}
+                  </button>
+                  <button
+                    onClick={() => deleteWebhook.mutate()}
+                    disabled={deleteWebhook.isPending}
+                    className="text-sm text-[#f14c4c] hover:text-red-400 px-3 py-2"
+                  >
+                    Delete webhook
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

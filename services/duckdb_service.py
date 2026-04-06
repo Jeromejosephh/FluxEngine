@@ -12,6 +12,7 @@ from models.step import Step
 from models.execution import Execution
 from models.schedule import Schedule
 from models.template import WorkflowTemplate
+from models.inbound_webhook import InboundWebhook
 
 
 class DuckDBService:
@@ -245,6 +246,25 @@ class DuckDBService:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_executions_workflow_id ON executions(workflow_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_schedules_workflow_id ON schedules(workflow_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_templates_created_by ON workflow_templates(created_by)")
+
+        # Inbound webhooks table
+        conn.execute("CREATE SEQUENCE IF NOT EXISTS seq_inbound_webhooks_id START 1")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS inbound_webhooks (
+                id INTEGER PRIMARY KEY DEFAULT nextval('seq_inbound_webhooks_id'),
+                table_id INTEGER NOT NULL UNIQUE,
+                token VARCHAR NOT NULL UNIQUE,
+                description VARCHAR,
+                is_enabled BOOLEAN DEFAULT TRUE,
+                trigger_workflow_id INTEGER,
+                created_by INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_triggered_at TIMESTAMP,
+                FOREIGN KEY (table_id) REFERENCES tables(id),
+                FOREIGN KEY (created_by) REFERENCES users(id)
+            )
+        """)
 
         # Unique index on template name (case-insensitive) for active templates only
         try:
@@ -1168,3 +1188,90 @@ class DuckDBService:
             "UPDATE workflow_templates SET is_active = FALSE, updated_at = ? WHERE id = ?",
             (datetime.now(timezone.utc), template_id),
         )
+
+    # Inbound webhook methods
+
+    def _row_to_inbound_webhook(self, row: Dict[str, Any]) -> InboundWebhook:
+        return InboundWebhook(
+            id=row["id"],
+            table_id=row["table_id"],
+            token=row["token"],
+            description=row["description"],
+            is_enabled=row["is_enabled"],
+            trigger_workflow_id=row["trigger_workflow_id"],
+            created_by=row["created_by"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            last_triggered_at=row["last_triggered_at"],
+        )
+
+    def create_inbound_webhook(self, table_id: int, token: str, description: Optional[str],
+                                trigger_workflow_id: Optional[int], created_by: int) -> InboundWebhook:
+        result = self.execute(
+            """
+            INSERT INTO inbound_webhooks
+                (table_id, token, description, trigger_workflow_id, is_enabled, created_by,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, TRUE, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            RETURNING *
+            """,
+            (table_id, token, description, trigger_workflow_id, created_by),
+        )
+        return self._row_to_inbound_webhook(result[0])
+
+    def get_inbound_webhook_by_token(self, token: str) -> Optional[InboundWebhook]:
+        result = self.execute(
+            "SELECT * FROM inbound_webhooks WHERE token = ? LIMIT 1", (token,)
+        )
+        return self._row_to_inbound_webhook(result[0]) if result else None
+
+    def get_inbound_webhook_by_table(self, table_id: int) -> Optional[InboundWebhook]:
+        result = self.execute(
+            "SELECT * FROM inbound_webhooks WHERE table_id = ? LIMIT 1", (table_id,)
+        )
+        return self._row_to_inbound_webhook(result[0]) if result else None
+
+    def update_inbound_webhook(self, webhook_id: int, is_enabled: Optional[bool] = None,
+                                description: Optional[str] = None,
+                                trigger_workflow_id: Optional[int] = None,
+                                token: Optional[str] = None) -> Optional[InboundWebhook]:
+        from datetime import datetime, timezone
+        result = self.execute("SELECT * FROM inbound_webhooks WHERE id = ? LIMIT 1", (webhook_id,))
+        if not result:
+            return None
+        row = result[0]
+        self.execute(
+            """
+            UPDATE inbound_webhooks SET
+                is_enabled = ?,
+                description = ?,
+                trigger_workflow_id = ?,
+                token = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                is_enabled if is_enabled is not None else row["is_enabled"],
+                description if description is not None else row["description"],
+                trigger_workflow_id if trigger_workflow_id is not None else row["trigger_workflow_id"],
+                token if token is not None else row["token"],
+                datetime.now(timezone.utc),
+                webhook_id,
+            ),
+        )
+        updated = self.execute("SELECT * FROM inbound_webhooks WHERE id = ? LIMIT 1", (webhook_id,))
+        return self._row_to_inbound_webhook(updated[0]) if updated else None
+
+    def delete_inbound_webhook(self, webhook_id: int) -> bool:
+        self.execute("DELETE FROM inbound_webhooks WHERE id = ?", (webhook_id,))
+        return True
+
+    def update_inbound_webhook_last_triggered(self, webhook_id: int) -> None:
+        from datetime import datetime, timezone
+        try:
+            self.execute(
+                "UPDATE inbound_webhooks SET last_triggered_at = ? WHERE id = ?",
+                (datetime.now(timezone.utc), webhook_id),
+            )
+        except Exception:
+            pass

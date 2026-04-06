@@ -11,6 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from routes import auth, tables, workflows, admin, templates
+from routes.inbound_webhooks import management_router as webhooks_mgmt_router, public_router as webhooks_public_router
 from services.duckdb_service import DuckDBService
 from services.scheduler_service import start_scheduler, stop_scheduler
 from utils.exceptions import FluxEngineException
@@ -105,6 +106,8 @@ app.include_router(tables.router, prefix="/api/tables", tags=["Tables"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["Workflows"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
+app.include_router(webhooks_mgmt_router, prefix="/api/webhooks", tags=["Webhooks"])
+app.include_router(webhooks_public_router, prefix="/webhooks", tags=["Webhooks (Public)"])
 
 
 if __name__ == "__main__":
