@@ -143,7 +143,7 @@ class DuckDBService:
                 id INTEGER PRIMARY KEY DEFAULT nextval('seq_steps_id'),
                 workflow_id INTEGER NOT NULL,
                 name VARCHAR NOT NULL,
-                step_type VARCHAR NOT NULL CHECK (step_type IN ('query', 'transform', 'condition', 'action')),
+                step_type VARCHAR NOT NULL,
                 config VARCHAR NOT NULL,
                 "order" INTEGER NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -153,6 +153,29 @@ class DuckDBService:
             )
         """)
         
+        # Migration: remove CHECK constraint from step_type if it exists
+        try:
+            conn.execute("INSERT INTO steps (workflow_id, name, step_type, config, \"order\", created_by) VALUES (0, '_test', 'email', '{}', -1, 0)")
+            conn.execute("DELETE FROM steps WHERE \"order\" = -1 AND name = '_test'")
+        except Exception:
+            # Constraint exists — recreate table without it
+            conn.execute("""
+                CREATE TABLE steps_new (
+                    id INTEGER PRIMARY KEY DEFAULT nextval('seq_steps_id'),
+                    workflow_id INTEGER NOT NULL,
+                    name VARCHAR NOT NULL,
+                    step_type VARCHAR NOT NULL,
+                    config VARCHAR NOT NULL,
+                    "order" INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_active BOOLEAN DEFAULT TRUE
+                )
+            """)
+            conn.execute("INSERT INTO steps_new SELECT id, workflow_id, name, step_type, config, \"order\", created_at, updated_at, is_active FROM steps")
+            conn.execute("DROP TABLE steps")
+            conn.execute("ALTER TABLE steps_new RENAME TO steps")
+
         # Audit entries table
         conn.execute("""
             CREATE SEQUENCE IF NOT EXISTS seq_audit_entries_id START 1
