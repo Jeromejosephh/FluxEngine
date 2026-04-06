@@ -50,7 +50,7 @@ async def list_catalog(
     return CATALOG
 
 
-@router.post("/catalog/{template_id}/activate", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/catalog/{template_id}/activate", status_code=status.HTTP_201_CREATED)
 async def activate_catalog_template(
     template_id: str,
     data: CatalogActivate,
@@ -58,14 +58,14 @@ async def activate_catalog_template(
 ):
     """
     Activate a catalog template for the current user.
-    Creates all required tables, the workflow, and its steps in one request.
-    Caller supplies values for each template input (e.g. {"email": "you@example.com"}).
+    Creates tables, workflow, steps, inbound webhooks, and a daily 9am schedule.
+    Returns workflow info plus form tokens for each table.
     """
+    import secrets
     tmpl = CATALOG_BY_ID.get(template_id)
     if not tmpl:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Catalog template '{template_id}' not found")
 
-    # Validate required inputs
     for inp in tmpl.get("inputs", []):
         key = inp["key"]
         if key not in data.inputs or not data.inputs[key].strip():
@@ -77,8 +77,9 @@ async def activate_catalog_template(
     table_service = TableService()
     db = DuckDBService()
 
-    # Create tables and track key → id mapping
+    # Create tables, physical tables, and inbound webhooks
     table_map: Dict[str, int] = {}
+    tables_out = []
     for tbl_def in tmpl.get("tables", []):
         try:
             table = table_service.create_table(
@@ -91,12 +92,16 @@ async def activate_catalog_template(
             )
             db.ensure_physical_table(table)
             table_map[tbl_def["key"]] = table.id
+
+            form_token = secrets.token_urlsafe(32)
+            db.create_inbound_webhook(table.id, form_token, "Form submissions", None, current_user.id)
+            tables_out.append({"id": table.id, "name": table.name, "form_token": form_token})
         except ValidationException as e:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
         except Exception as e:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    # Create the workflow (status = active so it can run immediately)
+    # Create workflow
     wf_def = tmpl["workflow"]
     try:
         workflow = db.create_workflow(
@@ -108,7 +113,7 @@ async def activate_catalog_template(
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-    # Create steps, substituting {table_key} and {input_key} placeholders
+    # Create steps with placeholders substituted
     def _substitute(obj: Any) -> Any:
         if isinstance(obj, str) and obj.startswith("{") and obj.endswith("}"):
             key = obj[1:-1]
@@ -142,6 +147,21 @@ async def activate_catalog_template(
         except Exception as e:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
+    # Auto-schedule: daily at 9am
+    try:
+        from services.scheduler_service import add_or_replace_job, _compute_next_run
+        cron_expr = "0 9 * * *"
+        db.create_schedule(
+            workflow_id=workflow.id,
+            cron_expr=cron_expr,
+            is_enabled=True,
+            created_by=current_user.id,
+            next_run_at=_compute_next_run(cron_expr),
+        )
+        add_or_replace_job(workflow.id, cron_expr, current_user.id)
+    except Exception:
+        pass  # schedule failure shouldn't block activation
+
     AuditService().log_action(
         user_id=current_user.id,
         action="activate_catalog_template",
@@ -150,7 +170,11 @@ async def activate_catalog_template(
         details=f"Activated catalog template '{template_id}' → workflow '{workflow.name}' (ID {workflow.id})",
     )
 
-    return workflow
+    return {
+        "workflow_id": workflow.id,
+        "workflow_name": workflow.name,
+        "tables": tables_out,
+    }
 
 
 # ---------------------------------------------------------------------------

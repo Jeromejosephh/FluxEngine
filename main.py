@@ -10,7 +10,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from routes import auth, tables, workflows, admin, templates
+from routes import auth, tables, workflows, admin, templates, forms
 from routes.inbound_webhooks import management_router as webhooks_mgmt_router, public_router as webhooks_public_router
 from services.duckdb_service import DuckDBService
 from services.scheduler_service import start_scheduler, stop_scheduler
@@ -108,6 +108,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(templates.router, prefix="/api/templates", tags=["Templates"])
 app.include_router(webhooks_mgmt_router, prefix="/api/webhooks", tags=["Webhooks"])
 app.include_router(webhooks_public_router, prefix="/webhooks", tags=["Webhooks (Public)"])
+app.include_router(forms.router, prefix="/forms", tags=["Forms (Public)"])
 
 
 if __name__ == "__main__":

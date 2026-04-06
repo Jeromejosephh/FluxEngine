@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 
+const FORM_BASE = "https://fluxengine-production.up.railway.app";
+
 interface CatalogInput { key: string; label: string; type: string; placeholder: string; }
 interface CatalogTemplate { id: string; name: string; description: string; icon: string; inputs: CatalogInput[]; }
 interface SavedTemplate { id: number; name: string; description: string; tags: string[]; step_configs: unknown[]; }
+interface ActivateResult { workflow_id: number; workflow_name: string; tables: { id: number; name: string; form_token: string }[]; }
 
 const inputCls = "bg-[#3c3c3c] border border-[#3e3e42] rounded px-3 py-2 text-sm text-[#d4d4d4] focus:outline-none focus:border-[#007acc] placeholder-[#858585] w-full";
 const btnPrimary = "bg-[#007acc] text-white rounded px-3 py-1.5 text-sm font-medium hover:bg-[#0069ac] disabled:opacity-50 transition-colors";
@@ -22,6 +25,8 @@ export default function TemplatesPage() {
   const [activating, setActivating] = useState<CatalogTemplate | null>(null);
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [activateError, setActivateError] = useState("");
+  const [activated, setActivated] = useState<ActivateResult | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Saved template cloning
   const [cloningTemplate, setCloningTemplate] = useState<SavedTemplate | null>(null);
@@ -40,14 +45,14 @@ export default function TemplatesPage() {
 
   const activate = useMutation({
     mutationFn: () =>
-      api.post(`/api/templates/catalog/${activating!.id}/activate`, { inputs: inputValues }),
-    onSuccess: () => {
+      api.post<ActivateResult>(`/api/templates/catalog/${activating!.id}/activate`, { inputs: inputValues }),
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: ["workflows"] });
       qc.invalidateQueries({ queryKey: ["tables"] });
       setActivating(null);
       setInputValues({});
       setActivateError("");
-      router.push("/workflows");
+      setActivated(result);
     },
     onError: (e: Error) => setActivateError(e.message),
   });
@@ -174,6 +179,45 @@ export default function TemplatesPage() {
                 </button>
                 <button onClick={() => setActivating(null)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success screen after activation */}
+      {activated && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-md">
+            <div className="text-2xl mb-2">✓</div>
+            <h2 className="font-semibold text-[#d4d4d4] mb-1">{activated.workflow_name} is ready</h2>
+            <p className="text-xs text-[#858585] mb-5">Runs automatically every day at 9am. Add data and it will email you.</p>
+
+            {activated.tables.map((t) => {
+              const formUrl = `${FORM_BASE}/form/${t.form_token}`;
+              return (
+                <div key={t.id} className="mb-4">
+                  <p className="text-xs text-[#858585] mb-1">Shareable form link for <span className="text-[#d4d4d4]">{t.name}</span></p>
+                  <div className="flex gap-2">
+                    <input readOnly value={formUrl} className="bg-[#3c3c3c] border border-[#3e3e42] rounded px-3 py-1.5 text-xs text-[#d4d4d4] flex-1 min-w-0" />
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(formUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                      className={btnSecondary + " shrink-0 text-xs"}
+                    >
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                  <p className="text-xs text-[#858585] mt-1">Share this link — anyone can fill in the form without logging in.</p>
+                </div>
+              );
+            })}
+
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => { setActivated(null); router.push("/workflows"); }} className={`flex-1 ${btnPrimary}`}>
+                Go to workflow
+              </button>
+              <button onClick={() => { setActivated(null); router.push("/tables"); }} className={`flex-1 ${btnSecondary}`}>
+                View table
+              </button>
             </div>
           </div>
         </div>

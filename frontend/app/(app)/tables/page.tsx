@@ -147,6 +147,29 @@ export default function TablesPage() {
     ? `https://fluxengine-production.up.railway.app/webhooks/inbound/${webhook.token}`
     : null;
 
+  const [importMsg, setImportMsg] = useState("");
+  async function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !selectedTable) return;
+    e.target.value = "";
+    const token = localStorage.getItem("token");
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch(
+        `https://fluxengine-production.up.railway.app/api/tables/${selectedTable.id}/import`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: form }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Import failed");
+      setImportMsg(`Imported ${data.inserted} row${data.inserted !== 1 ? "s" : ""}`);
+      qc.invalidateQueries({ queryKey: ["tableData", selectedTable.id] });
+    } catch (err) {
+      setImportMsg(err instanceof Error ? err.message : "Import failed");
+    }
+    setTimeout(() => setImportMsg(""), 4000);
+  }
+
   const cols = selectedTable?.schema_definition?.columns ?? [];
   const rows = tableData?.rows ?? [];
 
@@ -194,8 +217,13 @@ export default function TablesPage() {
                   <p className="text-xs text-[#858585] mt-0.5">{selectedTable.description}</p>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                {importMsg && <span className="text-xs text-[#4ec9b0]">{importMsg}</span>}
                 <button onClick={() => setShowAddRow(true)} className={btnPrimary}>+ Add row</button>
+                <label className={btnSecondary + " cursor-pointer"}>
+                  Import CSV
+                  <input type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
+                </label>
                 <button onClick={() => setShowWebhook(true)} className={btnSecondary}>Webhook</button>
                 <button
                   onClick={() => {

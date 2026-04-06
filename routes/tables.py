@@ -1,6 +1,8 @@
 """Table management routes"""
+import csv
+import io
 import json
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from typing import List, Dict, Any, Optional
 
 from schemas.table import TableCreate, TableUpdate, TableResponse, RowUpdate
@@ -355,6 +357,45 @@ async def update_row(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
     except ValidationException as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/{table_id}/import")
+async def import_csv(
+    table_id: int,
+    file: UploadFile = File(...),
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Import rows from a CSV file. Headers matched to table columns by name."""
+    await get_current_user_from_token(token)
+    table_service = TableService()
+
+    try:
+        table = table_service.get_table_by_id(table_id)
+        schema = json.loads(table.schema_definition)
+        allowed_columns = {col["name"] for col in schema.get("columns", [])}
+
+        content = await file.read()
+        text = content.decode("utf-8-sig")  # strip Excel BOM if present
+        reader = csv.DictReader(io.StringIO(text))
+
+        rows = []
+        for row in reader:
+            cleaned = {k: v for k, v in row.items() if k in allowed_columns and v != ""}
+            if cleaned:
+                rows.append(cleaned)
+
+        if not rows:
+            return {"inserted": 0, "message": "No matching columns found in CSV"}
+
+        from services.duckdb_service import DuckDBService
+        inserted = DuckDBService().insert_rows(table, rows)
+        return {"inserted": inserted}
+
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
