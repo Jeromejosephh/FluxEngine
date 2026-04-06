@@ -711,8 +711,12 @@ class DuckDBService:
             for f in filters:
                 col = f["column"]
                 op = op_map.get(f["op"], "=")
-                where_clauses.append(f'"{col}" {op} ?')
-                params.append(f["value"])
+                val = f["value"]
+                if isinstance(val, str) and op in ("=", "!="):
+                    where_clauses.append(f'LOWER("{col}") {op} LOWER(?)')
+                else:
+                    where_clauses.append(f'"{col}" {op} ?')
+                params.append(val)
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         query = f"SELECT * FROM data_{table.id} {where_sql} ORDER BY _row_id"
