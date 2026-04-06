@@ -1,4 +1,4 @@
-"""Admin routes — backup and restore"""
+"""Admin routes - backup and restore"""
 import os
 import shutil
 import tempfile

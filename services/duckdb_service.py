@@ -234,7 +234,7 @@ class DuckDBService:
         """)
 
         # Create indexes
-        # Note: idx_workflows_status is intentionally omitted — DuckDB 0.10.0 has
+        # Note: idx_workflows_status is intentionally omitted - DuckDB 0.10.0 has
         # an ART index bug where any UPDATE on an indexed column triggers a false
         # "Duplicate key" PK violation. Status is queried infrequently enough that
         # the missing index has no practical impact for MVP scale.
@@ -273,9 +273,9 @@ class DuckDBService:
                 WHERE is_active = TRUE
             """)
         except Exception:
-            pass  # Index already exists — safe to continue
+            pass  # Index already exists - safe to continue
 
-        # Note: idx_tables_name_unique is intentionally omitted — DuckDB 0.10.0 has
+        # Note: idx_tables_name_unique is intentionally omitted - DuckDB 0.10.0 has
         # an ART index bug where any UPDATE on an indexed column triggers a false
         # "Duplicate key" PK violation (same issue as idx_workflows_status).
         # Uniqueness is enforced at the service level via validate_table_name().

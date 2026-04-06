@@ -450,7 +450,7 @@ export default function TablesPage() {
                   </div>
                 </div>
                 <div className="text-xs text-[#858585] bg-[#2d2d2d] rounded p-3">
-                  <p className="mb-1">POST JSON to this URL — no auth required. Example:</p>
+                  <p className="mb-1">POST JSON to this URL - no auth required. Example:</p>
                   <pre className="font-mono text-[#858585] whitespace-pre-wrap">{`curl -X POST "${webhookUrl}" \\
   -H "Content-Type: application/json" \\
   -d '{"${cols[0]?.name ?? "field"}": "value"}'`}</pre>

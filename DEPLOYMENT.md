@@ -35,13 +35,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
 
 **Required before going live:**
-- `SECRET_KEY` — must not be the placeholder default
+- `SECRET_KEY` - must not be the placeholder default
 - `DEBUG=False`
-- `ALLOWED_ORIGINS` — set to your actual frontend domain
+- `ALLOWED_ORIGINS` - set to your actual frontend domain
 
 ---
 
-## 3. Option A — Docker (Recommended)
+## 3. Option A - Docker (Recommended)
 
 ### Single container
 
@@ -72,7 +72,7 @@ curl http://localhost:8000/health
 
 ---
 
-## 4. Option B — Without Docker
+## 4. Option B - Without Docker
 
 ```bash
 python -m venv .venv

@@ -160,7 +160,7 @@ async def delete_workflow(
     token: str = Depends(oauth2_scheme),
     _: None = Depends(require_role(["admin"]))
 ):
-    """Delete a workflow — soft delete (requires admin role)"""
+    """Delete a workflow - soft delete (requires admin role)"""
     user = await get_current_user_from_token(token)
     workflow_service = WorkflowService()
     audit_service = AuditService()
@@ -289,7 +289,7 @@ async def run_workflow(
             action="run",
             entity_type="workflow",
             entity_id=workflow_id,
-            details=f"Ran workflow {workflow_id} — success: {result.success}"
+            details=f"Ran workflow {workflow_id} - success: {result.success}"
         )
         return result
     except NotFoundException as e:

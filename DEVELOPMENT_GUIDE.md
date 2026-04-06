@@ -1,8 +1,8 @@
 # FluxEngine Development Guide
 
 **Last Updated:** 2026-04-05 (207/207 tests passing)
-**Project Status:** Complete ✅ — Live on Railway + Vercel
-**Current Phase:** N/A — Deployed
+**Project Status:** Complete ✅ - Live on Railway + Vercel
+**Current Phase:** N/A - Deployed
 
 ---
 
@@ -94,15 +94,15 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ StepService with per-type config validation
 - ✅ Physical table data storage (insert rows, query rows with filters)
 - ✅ Table data endpoints (POST /tables/{id}/data, GET /tables/{id}/data)
-- ✅ ExecutionService — runs steps sequentially, passes output as context
-- ✅ Query step handler — filters rows from a managed table
-- ✅ Transform step handler — column projection + row filtering in Python
+- ✅ ExecutionService - runs steps sequentially, passes output as context
+- ✅ Query step handler - filters rows from a managed table
+- ✅ Transform step handler - column projection + row filtering in Python
 - ✅ All workflow API endpoints (list, get, create, update, delete)
 - ✅ Step API endpoints (create step, list steps)
-- ✅ POST /api/workflows/{id}/run — executes workflow, returns per-step results
+- ✅ POST /api/workflows/{id}/run - executes workflow, returns per-step results
 - ✅ Audit logging for all workflow and step operations
 - ✅ Fixed DuckDB partial index IF NOT EXISTS bug on startup
-- ✅ Fixed DuckDB 0.10.0 ART index bug (removed idx_workflows_status — UPDATE on indexed column triggers false PK violation)
+- ✅ Fixed DuckDB 0.10.0 ART index bug (removed idx_workflows_status - UPDATE on indexed column triggers false PK violation)
 - ✅ 28/28 workflow tests passing
 
 ---
@@ -127,12 +127,12 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ Real-time execution monitoring (`executions` table + `GET /api/workflows/{id}/runs`)
 - ✅ Execution records persist per-step metadata, row counts, success/error state
 - ✅ 28/28 workflow tests passing
-- ✅ Action step type (webhook POST — `urllib`, supports `headers` + `timeout_seconds`)
-- ✅ Workflow scheduling (APScheduler — cron-based, `schedules` table, `POST/GET/PATCH/DELETE /api/workflows/{id}/schedule`)
-- ✅ API rate limiting (slowapi — 10/minute on `/run`, shared limiter, disabled in tests)
+- ✅ Action step type (webhook POST - `urllib`, supports `headers` + `timeout_seconds`)
+- ✅ Workflow scheduling (APScheduler - cron-based, `schedules` table, `POST/GET/PATCH/DELETE /api/workflows/{id}/schedule`)
+- ✅ API rate limiting (slowapi - 10/minute on `/run`, shared limiter, disabled in tests)
 - ✅ Workflow templates (`GET/POST /api/templates/`, `GET/DELETE /api/templates/{id}`, `POST /api/templates/{id}/clone`)
 - ✅ Database backup/restore (`GET /api/admin/backup`, `POST /api/admin/restore`, admin only)
-- ~~Caching layer~~ — deferred (low ROI at current scale)
+- ~~Caching layer~~ - deferred (low ROI at current scale)
 
 ---
 
@@ -154,13 +154,13 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - ✅ .dockerignore (excludes venv, data, .env, caches)
 - ✅ .env.example with all required variables
 - ✅ .gitignore covers .env, data/, .venv
-- ✅ CI/CD pipeline (GitHub Actions — runs on push/PR to main)
-- ✅ Test coverage at 90% (207/207 tests passing) — exceeds >80% target
-- ✅ Security audit complete — 10 issues fixed across auth, SSRF, headers, CORS, JWT
-- ✅ Deployment guide (`DEPLOYMENT.md` — Railway, Render, Docker, VPS, backup/restore)
+- ✅ CI/CD pipeline (GitHub Actions - runs on push/PR to main)
+- ✅ Test coverage at 90% (207/207 tests passing) - exceeds >80% target
+- ✅ Security audit complete - 10 issues fixed across auth, SSRF, headers, CORS, JWT
+- ✅ Deployment guide (`DEPLOYMENT.md` - Railway, Render, Docker, VPS, backup/restore)
 - ✅ `docker-compose.yml` with health check and persistent data volume
-- ✅ `.env.example` updated — `DEBUG=False`, secret key generation instructions
-- ✅ Performance — DuckDB handles thousands of concurrent users on a single node; no optimisation needed at current scale
+- ✅ `.env.example` updated - `DEBUG=False`, secret key generation instructions
+- ✅ Performance - DuckDB handles thousands of concurrent users on a single node; no optimisation needed at current scale
 
 ---
 
@@ -205,7 +205,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Implement workflow service (WorkflowService)
 - [x] Implement step service (StepService) with config validation
 - [x] Create workflow execution engine (ExecutionService)
-- [x] Implement step type handlers — query and transform
+- [x] Implement step type handlers - query and transform
 - [x] Add workflow state management (draft / active / archived)
 - [x] Implement error handling (step failure stops pipeline, error surfaced in response)
 - [x] Create workflow CRUD endpoints (list, get, create, update, delete)
@@ -221,7 +221,7 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Implement real-time monitoring (executions table + GET /api/workflows/{id}/runs)
 - [x] Implement action step type (webhook POST)
 - [x] Implement workflow scheduling (APScheduler)
-- [x] Add API rate limiting (slowapi — 10/minute on /run endpoint)
+- [x] Add API rate limiting (slowapi - 10/minute on /run endpoint)
 - [x] Create workflow templates (`GET/POST /api/templates/`, clone, soft delete, step config validation)
 - [x] Add workflow analytics
 - [x] Implement backup/restore
@@ -231,25 +231,25 @@ FluxEngine is a workflow automation engine with a Python/FastAPI backend and Duc
 - [x] Create .dockerignore
 - [x] Create .env.example
 - [x] Set up CI/CD pipeline (GitHub Actions)
-- [x] Achieve >80% test coverage (90% — 207/207 tests)
+- [x] Achieve >80% test coverage (90% - 207/207 tests)
 - [x] Security audit and hardening (SSRF, rate limiting, headers, JWT, CORS, error leakage)
-- [x] Performance optimization (DuckDB sufficient at current scale — documented)
+- [x] Performance optimization (DuckDB sufficient at current scale - documented)
 - [x] Deployment guide (DEPLOYMENT.md)
 - [x] Configure production environment (.env.example, docker-compose.yml)
 
 ### Phase 6: Frontend
 - [x] Init Next.js 14 project with App Router
 - [x] Set up Tailwind + shadcn/ui
-- [x] Add TanStack Query — wire up to FluxEngine API
+- [x] Add TanStack Query - wire up to FluxEngine API
 - [x] Build sidebar layout (shared across all pages)
-- [x] Tables page — list, create, spreadsheet view, add rows
-- [x] Workflows page — list + IF/THEN builder, activate, run, view results
-- [x] Logs page — execution history with expandable step detail
-- [x] Templates page — list and clone
-- [x] Settings page — account info
-- [x] Polish — loading states, error messages, empty states
-- [x] Auth guard — redirect to /login if no token
-- [x] Dark theme — VS Code colour scheme across all pages
+- [x] Tables page - list, create, spreadsheet view, add rows
+- [x] Workflows page - list + IF/THEN builder, activate, run, view results
+- [x] Logs page - execution history with expandable step detail
+- [x] Templates page - list and clone
+- [x] Settings page - account info
+- [x] Polish - loading states, error messages, empty states
+- [x] Auth guard - redirect to /login if no token
+- [x] Dark theme - VS Code colour scheme across all pages
 - [x] Deploy to Vercel + Railway
 
 ---
@@ -296,29 +296,29 @@ Legend: ✅ Complete  🔄 Partially Started  ⏳ Not Started
 - ✅ Per-step metadata persisted on every workflow run (no output bloat)
 
 ### Recently Completed
-- ✅ Project complete — all 5 stages done, 207/207 tests passing, 90% coverage
-- ✅ Deployment guide (`DEPLOYMENT.md`) — Railway, Render, Docker, VPS, backup/restore, production checklist
+- ✅ Project complete - all 5 stages done, 207/207 tests passing, 90% coverage
+- ✅ Deployment guide (`DEPLOYMENT.md`) - Railway, Render, Docker, VPS, backup/restore, production checklist
 - ✅ `docker-compose.yml` with health check and named data volume
-- ✅ `.env.example` hardened — `DEBUG=False`, secret key instructions
-- ✅ Security audit — SSRF, auth rate limiting, security headers, CORS, JWT timezone, error leakage
-- ✅ Full table CRUD test coverage — list, get, create, update, delete + row operations
-- ✅ Workflow templates — create, clone, delete with full step config validation
+- ✅ `.env.example` hardened - `DEBUG=False`, secret key instructions
+- ✅ Security audit - SSRF, auth rate limiting, security headers, CORS, JWT timezone, error leakage
+- ✅ Full table CRUD test coverage - list, get, create, update, delete + row operations
+- ✅ Workflow templates - create, clone, delete with full step config validation
 - ✅ Fixed RBAC: `require_admin`/`require_editor` made async, now correctly resolve user via FastAPI dependency injection
 - ✅ Fixed JWT timezone bug: test now uses `timezone.utc` on both sides
-- ✅ GitHub Actions CI — `.github/workflows/test.yml`, runs pytest on push/PR to main
-- ✅ Dockerfile — `python:3.9-slim`, installs deps, exposes port 8000
-- ✅ `.dockerignore` — excludes venv, data dir, .env, caches
+- ✅ GitHub Actions CI - `.github/workflows/test.yml`, runs pytest on push/PR to main
+- ✅ Dockerfile - `python:3.9-slim`, installs deps, exposes port 8000
+- ✅ `.dockerignore` - excludes venv, data dir, .env, caches
 - ✅ API rate limiting: 10/minute on `/run`, shared `utils/limiter.py`, disabled in tests via `conftest.py`
 - ✅ Real-time monitoring: `executions` table persists every workflow run
-- ✅ `GET /api/workflows/{id}/runs` — paginated execution history, newest first
+- ✅ `GET /api/workflows/{id}/runs` - paginated execution history, newest first
 - ✅ Table row update: `PUT /api/tables/{id}/data/{row_id}` with column validation
 - ✅ Table row delete: `DELETE /api/tables/{id}/data/{row_id}` with 404 guard
 
 ### Recently Fixed
-- ✅ DuckDB ART index bug on table name update — `idx_tables_name_unique` caused false PK violation; removed, service check retained
-- ✅ `datetime.utcnow()` in JWT — replaced with `datetime.now(timezone.utc)` throughout auth service
-- ✅ RBAC coroutine bug — `require_admin`/`require_editor` returned unawaited coroutine; fixed by making them `async def` with `await`
-- ✅ DuckDB 0.10.0 ART index bug — UPDATE on any indexed column triggers false PK violation (removed idx_workflows_status)
+- ✅ DuckDB ART index bug on table name update - `idx_tables_name_unique` caused false PK violation; removed, service check retained
+- ✅ `datetime.utcnow()` in JWT - replaced with `datetime.now(timezone.utc)` throughout auth service
+- ✅ RBAC coroutine bug - `require_admin`/`require_editor` returned unawaited coroutine; fixed by making them `async def` with `await`
+- ✅ DuckDB 0.10.0 ART index bug - UPDATE on any indexed column triggers false PK violation (removed idx_workflows_status)
 - ✅ DuckDB UPDATE with COALESCE causing PK constraint violation (replaced with dynamic query builder)
 
 ### Blocked/Issues
@@ -373,19 +373,19 @@ All backend stages shipped. Next focus is the frontend.
   - Query step: pick table from dropdown
   - Condition step: column / operator / value (dropdowns + input)
   - Action step: paste webhook URL
-- Test run button — fires workflow and shows result inline
+- Test run button - fires workflow and shows result inline
 - Schedule toggle (daily, hourly, custom cron)
 
 **Logs**
 - Table of every workflow run (newest first)
 - Columns: workflow name, ran at, success/fail, rows processed
 - Click a row → expand to see per-step output and payload
-- This is a key trust-building feature — ship it early
+- This is a key trust-building feature - ship it early
 
 **Templates**
 - Grid of prebuilt workflow cards
 - Clone button → creates a live workflow instantly
-- Growth engine for later — add more templates per niche
+- Growth engine for later - add more templates per niche
 
 ### Deployment
 - Frontend → Vercel (free)
@@ -394,13 +394,13 @@ All backend stages shipped. Next focus is the frontend.
 ### Checklist
 - [ ] Init Next.js 14 project with App Router
 - [ ] Set up Tailwind + shadcn/ui
-- [ ] Add TanStack Query — wire up to FluxEngine API
+- [ ] Add TanStack Query - wire up to FluxEngine API
 - [ ] Build sidebar layout (shared across all pages)
-- [ ] Tables page — list, create, spreadsheet view
-- [ ] Workflows page — list + IF/THEN builder
-- [ ] Logs page — execution history with expandable rows
-- [ ] Templates page — clone from prebuilt list
-- [ ] Settings page — account info
+- [ ] Tables page - list, create, spreadsheet view
+- [ ] Workflows page - list + IF/THEN builder
+- [ ] Logs page - execution history with expandable rows
+- [ ] Templates page - clone from prebuilt list
+- [ ] Settings page - account info
 - [ ] Deploy to Vercel
 
 ---
@@ -591,9 +591,9 @@ pytest tests/test_auth.py::TestPasswordHashing -v
 **Status:** 14/14 tests passing (100% pass rate) ✅
 
 **Test Categories:**
-- ✅ Auth guards (4/4 tests) — list, create, update row, delete row without token
-- ✅ Row update — success, multi-column, 404, unknown column, empty data, table not found (6/6)
-- ✅ Row delete — success, 404, table not found, double-delete (4/4)
+- ✅ Auth guards (4/4 tests) - list, create, update row, delete row without token
+- ✅ Row update - success, multi-column, 404, unknown column, empty data, table not found (6/6)
+- ✅ Row delete - success, 404, table not found, double-delete (4/4)
 
 ---
 
@@ -605,10 +605,10 @@ pytest tests/test_auth.py::TestPasswordHashing -v
 - ✅ Workflow CRUD (8/8 tests)
 - ✅ Step CRUD (4/4 tests)
 - ✅ Table data insert/query (2/2 tests)
-- ✅ Workflow execution — query, transform, error cases (6/6 tests)
-- ✅ Execution history — persist, paginate, auth, 404 (8/8 tests)
-- ✅ Action steps — webhook POST, passthrough, errors, custom headers (9/9 tests)
-- ✅ Scheduling — cron CRUD, validation, enable/disable, auth (18/18 tests)
+- ✅ Workflow execution - query, transform, error cases (6/6 tests)
+- ✅ Execution history - persist, paginate, auth, 404 (8/8 tests)
+- ✅ Action steps - webhook POST, passthrough, errors, custom headers (9/9 tests)
+- ✅ Scheduling - cron CRUD, validation, enable/disable, auth (18/18 tests)
 
 ---
 

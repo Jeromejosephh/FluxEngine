@@ -43,4 +43,4 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if settings.SECRET_KEY == _INSECURE_SECRET:
-    warnings.warn("SECRET_KEY is the default placeholder — set a real value before deploying.", stacklevel=1)
+    warnings.warn("SECRET_KEY is the default placeholder - set a real value before deploying.", stacklevel=1)

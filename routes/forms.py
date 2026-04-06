@@ -1,4 +1,4 @@
-"""Public form routes — no authentication required"""
+"""Public form routes - no authentication required"""
 import json
 from fastapi import APIRouter, HTTPException
 from typing import Any, Dict

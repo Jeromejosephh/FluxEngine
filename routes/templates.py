@@ -45,7 +45,7 @@ def _template_to_response(template) -> TemplateResponse:
 
 
 # ---------------------------------------------------------------------------
-# Catalog: pre-built templates — must be registered BEFORE /{template_id}
+# Catalog: pre-built templates - must be registered BEFORE /{template_id}
 # ---------------------------------------------------------------------------
 
 @router.get("/catalog", response_model=List[Dict[str, Any]])
@@ -98,6 +98,10 @@ async def activate_catalog_template(
             )
             db.ensure_physical_table(table)
             table_map[tbl_def["key"]] = table.id
+
+            sample_rows = tbl_def.get("sample_rows", [])
+            if sample_rows:
+                db.insert_rows(table, sample_rows)
 
             form_token = secrets.token_urlsafe(32)
             db.create_inbound_webhook(table.id, form_token, "Form submissions", None, current_user.id)

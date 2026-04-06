@@ -11,7 +11,7 @@ from utils.exceptions import ValidationException
 
 logger = logging.getLogger(__name__)
 
-# Module-level singleton — started once in main.py lifespan
+# Module-level singleton - started once in main.py lifespan
 _scheduler: Optional[BackgroundScheduler] = None
 
 
@@ -48,7 +48,7 @@ def _compute_next_run(cron_expr: str) -> Optional[datetime]:
 
 def _run_scheduled_workflow(workflow_id: int, user_id: int) -> None:
     """
-    APScheduler job target — runs the workflow and persists the execution record.
+    APScheduler job target - runs the workflow and persists the execution record.
     Errors are logged but never re-raised (APScheduler would remove the job on exception).
     """
     from services.execution_service import ExecutionService

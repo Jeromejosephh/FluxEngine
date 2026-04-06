@@ -1,4 +1,4 @@
-"""Pre-built template catalog — hardcoded, product-defined templates."""
+"""Pre-built template catalog - hardcoded, product-defined templates."""
 
 CATALOG = [
     {
@@ -26,6 +26,11 @@ CATALOG = [
                     {"name": "applied_date", "type": "DATE", "nullable": True},
                     {"name": "follow_up_date", "type": "DATE", "nullable": True},
                     {"name": "notes", "type": "VARCHAR", "nullable": True},
+                ],
+                "sample_rows": [
+                    {"company": "Google", "role": "Software Engineer", "status": "applied", "applied_date": "2026-04-01", "follow_up_date": "2026-04-15", "notes": "Applied via LinkedIn"},
+                    {"company": "Stripe", "role": "Product Manager", "status": "applied", "applied_date": "2026-04-03", "follow_up_date": "2026-04-17", "notes": "Referral from a friend"},
+                    {"company": "Airbnb", "role": "Frontend Engineer", "status": "interview", "applied_date": "2026-03-28", "follow_up_date": "2026-04-10", "notes": "Phone screen scheduled"},
                 ],
             }
         ],
@@ -85,6 +90,11 @@ CATALOG = [
                     {"name": "amount", "type": "FLOAT", "nullable": True},
                     {"name": "description", "type": "VARCHAR", "nullable": True},
                 ],
+                "sample_rows": [
+                    {"date": "2026-04-01", "category": "Food", "amount": 12.50, "description": "Lunch"},
+                    {"date": "2026-04-02", "category": "Transport", "amount": 25.00, "description": "Uber to airport"},
+                    {"date": "2026-04-03", "category": "Software", "amount": 49.99, "description": "Adobe subscription"},
+                ],
             }
         ],
         "workflow": {
@@ -135,6 +145,11 @@ CATALOG = [
                     {"name": "context", "type": "VARCHAR", "nullable": True},
                     {"name": "status", "type": "VARCHAR", "nullable": True},
                     {"name": "follow_up_date", "type": "DATE", "nullable": True},
+                ],
+                "sample_rows": [
+                    {"name": "Sarah Chen", "company": "Stripe", "context": "Met at conference", "status": "pending", "follow_up_date": "2026-04-10"},
+                    {"name": "James Okafor", "company": "Y Combinator", "context": "Intro call scheduled", "status": "pending", "follow_up_date": "2026-04-12"},
+                    {"name": "Maria Lopez", "company": "Figma", "context": "Coffee chat", "status": "pending", "follow_up_date": "2026-04-08"},
                 ],
             }
         ],

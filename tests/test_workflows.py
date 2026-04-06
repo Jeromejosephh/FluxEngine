@@ -319,7 +319,7 @@ class TestWorkflowExecution:
         result = r.json()
         final = result["final_output"]
         assert len(final) == 2
-        # Only issue_type and priority should be present — not status
+        # Only issue_type and priority should be present - not status
         for row in final:
             assert "issue_type" in row
             assert "priority" in row
@@ -417,7 +417,7 @@ class TestExecutionHistory:
         assert r.status_code == 404
 
     def test_failed_run_is_recorded(self, auth_headers, test_db):
-        # Draft workflow — run will be rejected before execution, so use
+        # Draft workflow - run will be rejected before execution, so use
         # a workflow with no steps pointing at a nonexistent table to force failure
         r = client.post("/api/workflows/", json={"name": "Fail WF", "status": "draft"}, headers=auth_headers)
         wf_id = r.json()["id"]
@@ -428,7 +428,7 @@ class TestExecutionHistory:
         client.put(f"/api/workflows/{wf_id}", json={"status": "active"}, headers=auth_headers)
 
         run_r = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
-        # Execution may return 200 with success=false, or 500 — either records history
+        # Execution may return 200 with success=false, or 500 - either records history
         if run_r.status_code == 200:
             assert run_r.json()["success"] is False
             runs = client.get(f"/api/workflows/{wf_id}/runs", headers=auth_headers).json()

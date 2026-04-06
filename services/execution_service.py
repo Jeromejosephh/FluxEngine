@@ -85,7 +85,7 @@ class ExecutionService:
                 else:
                     output = self._run_action_step(config, context_rows)
             else:
-                # condition — not yet implemented, pass through
+                # condition - not yet implemented, pass through
                 output = context_rows
 
             return StepResult(
@@ -107,7 +107,7 @@ class ExecutionService:
 
     def _run_query_step(self, config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Query step — reads rows from a managed table with optional filters.
+        Query step - reads rows from a managed table with optional filters.
 
         Config shape:
           {
@@ -134,13 +134,13 @@ class ExecutionService:
         rows: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Transform step — applies column projection and/or row filtering
+        Transform step - applies column projection and/or row filtering
         to the previous step's output entirely in Python.
 
         Config shape:
           {
-            "select_columns": ["name", "email"],   # optional — keep only these columns
-            "filter": {                             # optional — keep rows matching condition
+            "select_columns": ["name", "email"],   # optional - keep only these columns
+            "filter": {                             # optional - keep rows matching condition
               "column": "status",
               "op": "eq",
               "value": "open"
@@ -170,7 +170,7 @@ class ExecutionService:
         rows: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Action step — POSTs the current context rows as JSON to a webhook URL.
+        Action step - POSTs the current context rows as JSON to a webhook URL.
 
         Config shape:
           {
@@ -221,7 +221,7 @@ class ExecutionService:
         rows: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Notify step — formats rows into a human-readable message and POSTs
+        Notify step - formats rows into a human-readable message and POSTs
         to a webhook URL (designed for ntfy.sh but works with any plain-text webhook).
 
         Config shape:
@@ -280,7 +280,7 @@ class ExecutionService:
         rows: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Email step — sends a formatted email via SendGrid HTTP API.
+        Email step - sends a formatted email via SendGrid HTTP API.
 
         Config shape:
           {

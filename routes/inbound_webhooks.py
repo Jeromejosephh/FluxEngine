@@ -132,7 +132,7 @@ async def delete_webhook(
 
 
 # ---------------------------------------------------------------------------
-# Public receive endpoint (no auth — token in URL is the credential)
+# Public receive endpoint (no auth - token in URL is the credential)
 # ---------------------------------------------------------------------------
 
 @public_router.post("/inbound/{token}", response_model=WebhookReceiveResponse)

@@ -336,7 +336,7 @@ export default function WorkflowsPage() {
                   </div>
                 ))}
                 {steps.length === 0 && (
-                  <p className="text-sm text-[#858585]">No steps yet — add one to get started</p>
+                  <p className="text-sm text-[#858585]">No steps yet - add one to get started</p>
                 )}
               </div>
             </div>
@@ -491,11 +491,11 @@ export default function WorkflowsPage() {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs text-[#858585] uppercase tracking-wide">Type</label>
                 <select value={stepType} onChange={(e) => setStepType(e.target.value)} className={inputCls}>
-                  <option value="query">GET — fetch rows from a table</option>
-                  <option value="condition">IF — filter rows by a rule</option>
-                  <option value="action">THEN — send raw JSON to a webhook</option>
-                  <option value="notify">THEN — send formatted message (ntfy, Slack, etc.)</option>
-                  <option value="email">THEN — send formatted email</option>
+                  <option value="query">GET - fetch rows from a table</option>
+                  <option value="condition">IF - filter rows by a rule</option>
+                  <option value="action">THEN - send raw JSON to a webhook</option>
+                  <option value="notify">THEN - send formatted message (ntfy, Slack, etc.)</option>
+                  <option value="email">THEN - send formatted email</option>
                 </select>
               </div>
 

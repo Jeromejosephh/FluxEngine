@@ -90,7 +90,7 @@ export default function TemplatesPage() {
       {/* Catalog section */}
       <div>
         <h1 className="text-base font-semibold text-[#d4d4d4] mb-1">Templates</h1>
-        <p className="text-xs text-[#858585] mb-4">Pick a template and you&apos;re ready to go — tables, workflow, and steps are all created automatically.</p>
+        <p className="text-xs text-[#858585] mb-4">Pick a template and you&apos;re ready to go - tables, workflow, and steps are all created automatically.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {catalog.map((t) => (
             <div key={t.id} className="border border-[#3e3e42] rounded-lg p-5 bg-[#252526] flex flex-col gap-3">
@@ -206,7 +206,7 @@ export default function TemplatesPage() {
                       {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
-                  <p className="text-xs text-[#858585] mt-1">Share this link — anyone can fill in the form without logging in.</p>
+                  <p className="text-xs text-[#858585] mt-1">Share this link - anyone can fill in the form without logging in.</p>
                 </div>
               );
             })}

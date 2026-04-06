@@ -151,7 +151,7 @@ class TestWorkflowAnalytics:
     def test_analytics_recent_runs(self, auth_headers, test_db, workflow_with_runs):
         r = client.get(f"/api/workflows/{workflow_with_runs}/analytics", headers=auth_headers)
         data = r.json()
-        # All 3 runs just happened — should appear in both windows
+        # All 3 runs just happened - should appear in both windows
         assert data["runs_last_7_days"] == 3
         assert data["runs_last_30_days"] == 3
 
