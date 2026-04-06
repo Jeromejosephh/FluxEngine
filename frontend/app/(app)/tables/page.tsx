@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { showToast } from "@/components/Toast";
 
 interface Column { name: string; type: string; }
 interface Table {
@@ -42,6 +43,7 @@ export default function TablesPage() {
   // Inbound webhook
   const [showWebhook, setShowWebhook] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [formCopied, setFormCopied] = useState(false);
 
   // Add row
   const [showAddRow, setShowAddRow] = useState(false);
@@ -75,6 +77,7 @@ export default function TablesPage() {
       setNewTableName(""); setNewTableDesc("");
       setColumns([{ name: "", type: "VARCHAR" }]);
       setCreateError("");
+      showToast("Table created");
     },
     onError: (e: Error) => setCreateError(e.message),
   });
@@ -86,7 +89,9 @@ export default function TablesPage() {
       qc.invalidateQueries({ queryKey: ["tables"] });
       setSelectedTable(updated as Table);
       setShowEditTable(false);
+      showToast("Table updated");
     },
+    onError: (e: Error) => showToast(e.message, "error"),
   });
 
   const deleteTable = useMutation({
@@ -94,7 +99,9 @@ export default function TablesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tables"] });
       setSelectedTable(null);
+      showToast("Table deleted");
     },
+    onError: (e: Error) => showToast(e.message, "error"),
   });
 
   const addRow = useMutation({
@@ -124,9 +131,12 @@ export default function TablesPage() {
   const { data: webhook, refetch: refetchWebhook } = useQuery<InboundWebhook>({
     queryKey: ["webhook", selectedTable?.id],
     queryFn: () => api.get(`/api/webhooks/tables/${selectedTable!.id}/`),
-    enabled: !!selectedTable && showWebhook,
+    enabled: !!selectedTable,
     retry: false,
   });
+
+  const FRONTEND_BASE = typeof window !== "undefined" ? window.location.origin : "";
+  const formUrl = webhook ? `${FRONTEND_BASE}/form/${webhook.token}` : null;
 
   const createWebhook = useMutation({
     mutationFn: () => api.post(`/api/webhooks/tables/${selectedTable!.id}/`, {}),
@@ -303,6 +313,18 @@ export default function TablesPage() {
               </table>
             </div>
             <p className="text-xs text-[#858585] mt-2">{tableData?.count ?? 0} rows</p>
+            {formUrl && (
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs text-[#858585] shrink-0">Form URL</span>
+                <input readOnly value={formUrl} className="flex-1 min-w-0 bg-[#1e1e1e] border border-[#3e3e42] rounded px-3 py-1.5 text-xs text-[#4ec9b0] font-mono focus:outline-none" />
+                <button
+                  onClick={() => { navigator.clipboard.writeText(formUrl); setFormCopied(true); setTimeout(() => setFormCopied(false), 2000); }}
+                  className={btnSecondary + " shrink-0 text-xs py-1.5"}
+                >
+                  {formCopied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

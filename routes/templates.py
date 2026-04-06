@@ -26,7 +26,7 @@ router = APIRouter()
 def _check_template_ownership(template, user):
     """Raise 404 if editor tries to access another user's template."""
     if user.role != "admin" and template.created_by != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Template not found")
+        raise NotFoundException("Template not found")
 
 
 def _template_to_response(template) -> TemplateResponse:
@@ -281,7 +281,6 @@ async def clone_template(
     try:
         template_service = TemplateService()
         template = template_service.get_template_by_id(template_id)
-        _check_template_ownership(template, current_user)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
 

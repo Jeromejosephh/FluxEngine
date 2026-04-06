@@ -366,6 +366,10 @@ class ExecutionService:
                 return cell_value < target
             if op == "lte":
                 return cell_value <= target
+            if op == "contains":
+                if isinstance(cell_value, str) and isinstance(target, str):
+                    return target.lower() in cell_value.lower()
+                return False
         except TypeError:
             return False
         return False

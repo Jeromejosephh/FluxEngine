@@ -325,11 +325,11 @@ class TestWorkflowExecution:
             assert "priority" in row
             assert "status" not in row
 
-    def test_run_draft_workflow_rejected(self, auth_headers, test_db):
+    def test_run_draft_workflow_allowed(self, auth_headers, test_db):
         r = client.post("/api/workflows/", json={"name": "Draft WF", "status": "draft"}, headers=auth_headers)
         wf_id = r.json()["id"]
         r2 = client.post(f"/api/workflows/{wf_id}/run", headers=auth_headers)
-        assert r2.status_code == 422
+        assert r2.status_code == 200
 
     def test_run_nonexistent_workflow_returns_404(self, auth_headers, test_db):
         r = client.post("/api/workflows/9999/run", headers=auth_headers)

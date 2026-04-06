@@ -24,8 +24,7 @@ router = APIRouter()
 def _check_table_ownership(table, user):
     """Raise 404 if editor tries to access another user's table."""
     if user.role != "admin" and table.created_by != user.id:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Table not found")
+        raise NotFoundException("Table not found")
 
 
 async def get_current_user_from_token(token: str):

@@ -13,6 +13,12 @@ class WorkflowService:
     def __init__(self):
         self.db_service = DuckDBService()
 
+    def _validate_workflow_name(self, name: str, user_id: int, exclude_id: Optional[int] = None) -> None:
+        """Raise ValidationException if name already exists for this user."""
+        existing = self.db_service.get_workflow_by_name(name, user_id=user_id)
+        if existing and (exclude_id is None or existing.id != exclude_id):
+            raise ValidationException(f"Workflow with name '{name}' already exists")
+
     def create_workflow(self, data: WorkflowCreate, user_id: int) -> Workflow:
         """
         Create a new workflow.
@@ -21,6 +27,7 @@ class WorkflowService:
             ValidationException: If a workflow with the same name already exists.
             DatabaseException: On database errors.
         """
+        self._validate_workflow_name(data.name, user_id)
         try:
             return self.db_service.create_workflow(
                 name=data.name,
@@ -29,8 +36,6 @@ class WorkflowService:
                 created_by=user_id
             )
         except Exception as e:
-            if "unique" in str(e).lower() or "duplicate" in str(e).lower():
-                raise ValidationException(f"Workflow with name '{data.name}' already exists")
             raise DatabaseException(f"Failed to create workflow: {str(e)}")
 
     def get_workflow_by_id(self, workflow_id: int) -> Workflow:
@@ -59,6 +64,9 @@ class WorkflowService:
         """
         # Verify exists first
         self.get_workflow_by_id(workflow_id)
+
+        if updates.name is not None:
+            self._validate_workflow_name(updates.name, user_id, exclude_id=workflow_id)
 
         try:
             workflow = self.db_service.update_workflow(

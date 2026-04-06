@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { showToast } from "@/components/Toast";
 
 const FORM_BASE = typeof window !== "undefined" ? window.location.origin : "";
 
@@ -72,7 +73,8 @@ export default function TemplatesPage() {
 
   const deleteTemplate = useMutation({
     mutationFn: (id: number) => api.delete(`/api/templates/${id}/`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["templates"] }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["templates"] }); showToast("Template deleted"); },
+    onError: (e: Error) => showToast(e.message, "error"),
   });
 
   const openActivate = (t: CatalogTemplate) => {
@@ -87,9 +89,43 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-8">
-      {/* Catalog section */}
+      {/* My Templates - primary section */}
       <div>
-        <h1 className="text-base font-semibold text-[#d4d4d4] mb-1">Templates</h1>
+        <h1 className="text-base font-semibold text-[#d4d4d4] mb-1">My Templates</h1>
+        <p className="text-xs text-[#858585] mb-4">Your saved workflows, ready to reuse.</p>
+        {saved.length === 0 ? (
+          <p className="text-sm text-[#858585]">No saved templates yet - save a workflow as a template to see it here.</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            {saved.map((t) => (
+              <div key={t.id} className="border border-[#3e3e42] rounded-lg p-4 bg-[#252526]">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 className="font-medium text-sm text-[#d4d4d4]">{t.name}</h3>
+                    {t.description && <p className="text-xs text-[#858585] mt-1">{t.description}</p>}
+                  </div>
+                  <button onClick={() => deleteTemplate.mutate(t.id)} className="text-xs text-[#858585] hover:text-[#f14c4c] shrink-0">Delete</button>
+                </div>
+                <div className="flex gap-1 mt-2 flex-wrap">
+                  {t.tags?.map((tag) => (
+                    <span key={tag} className="text-xs bg-[#37373d] text-[#858585] px-2 py-0.5 rounded">{tag}</span>
+                  ))}
+                </div>
+                <p className="text-xs text-[#858585] mt-2">
+                  {Array.isArray(t.step_configs) ? t.step_configs.length : 0} step{Array.isArray(t.step_configs) && t.step_configs.length !== 1 ? "s" : ""}
+                </p>
+                <button onClick={() => { setCloningTemplate(t); setCloneName(`${t.name} copy`); setCloneError(""); }} className={`mt-3 ${btnPrimary}`}>
+                  Use template
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Browse Templates - catalog */}
+      <div>
+        <h2 className="text-sm font-semibold text-[#d4d4d4] mb-1">Browse Templates</h2>
         <p className="text-xs text-[#858585] mb-4">Pick a template and you&apos;re ready to go - tables, workflow, and steps are all created automatically.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {catalog.map((t) => (
@@ -106,45 +142,6 @@ export default function TemplatesPage() {
           ))}
         </div>
       </div>
-
-      {/* Saved templates section */}
-      {saved.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-[#d4d4d4] mb-3">My Templates</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {saved.map((t) => (
-              <div key={t.id} className="border border-[#3e3e42] rounded-lg p-4 bg-[#252526]">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-medium text-sm text-[#d4d4d4]">{t.name}</h3>
-                    {t.description && <p className="text-xs text-[#858585] mt-1">{t.description}</p>}
-                  </div>
-                  <button
-                    onClick={() => deleteTemplate.mutate(t.id)}
-                    className="text-xs text-[#858585] hover:text-[#f14c4c] shrink-0"
-                  >
-                    Delete
-                  </button>
-                </div>
-                <div className="flex gap-1 mt-2 flex-wrap">
-                  {t.tags?.map((tag) => (
-                    <span key={tag} className="text-xs bg-[#37373d] text-[#858585] px-2 py-0.5 rounded">{tag}</span>
-                  ))}
-                </div>
-                <p className="text-xs text-[#858585] mt-2">
-                  {Array.isArray(t.step_configs) ? t.step_configs.length : 0} step{Array.isArray(t.step_configs) && t.step_configs.length !== 1 ? "s" : ""}
-                </p>
-                <button
-                  onClick={() => { setCloningTemplate(t); setCloneName(`${t.name} copy`); setCloneError(""); }}
-                  className={`mt-3 ${btnPrimary}`}
-                >
-                  Use template
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Activate catalog modal */}
       {activating && (

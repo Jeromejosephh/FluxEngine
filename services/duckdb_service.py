@@ -710,13 +710,18 @@ class DuckDBService:
         if filters:
             for f in filters:
                 col = f["column"]
-                op = op_map.get(f["op"], "=")
+                raw_op = f["op"]
                 val = f["value"]
-                if isinstance(val, str) and op in ("=", "!="):
-                    where_clauses.append(f'LOWER("{col}") {op} LOWER(?)')
-                else:
-                    where_clauses.append(f'"{col}" {op} ?')
-                params.append(val)
+                if raw_op == "contains":
+                    where_clauses.append(f'LOWER("{col}") LIKE LOWER(?)')
+                    params.append(f"%{val}%")
+                elif raw_op in op_map:
+                    op = op_map[raw_op]
+                    if isinstance(val, str) and op in ("=", "!="):
+                        where_clauses.append(f'LOWER("{col}") {op} LOWER(?)')
+                    else:
+                        where_clauses.append(f'"{col}" {op} ?')
+                    params.append(val)
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         query = f"SELECT * FROM data_{table.id} {where_sql} ORDER BY _row_id"
@@ -905,6 +910,22 @@ class DuckDBService:
             raise Exception("Failed to create workflow")
         row = result[0]
         return Workflow(**row)
+
+    def get_workflow_by_name(self, name: str, user_id: Optional[int] = None) -> Optional[Workflow]:
+        """Get workflow by name (case-insensitive), optionally scoped to a user."""
+        if user_id is not None:
+            result = self.execute(
+                "SELECT id, name, description, status, created_by, created_at, updated_at, is_active FROM workflows WHERE LOWER(name) = LOWER(?) AND created_by = ? AND is_active = TRUE LIMIT 1",
+                (name, user_id)
+            )
+        else:
+            result = self.execute(
+                "SELECT id, name, description, status, created_by, created_at, updated_at, is_active FROM workflows WHERE LOWER(name) = LOWER(?) AND is_active = TRUE LIMIT 1",
+                (name,)
+            )
+        if not result:
+            return None
+        return Workflow(**result[0])
 
     def get_workflow_by_id(self, workflow_id: int) -> Optional[Workflow]:
         """Get a workflow by ID."""

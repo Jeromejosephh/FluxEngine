@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/src/api";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { showToast } from "@/components/Toast";
 
 interface Workflow {
   id: number; name: string; description: string;
@@ -50,6 +51,7 @@ export default function WorkflowsPage() {
   const [newDesc, setNewDesc] = useState("");
   const [runResult, setRunResult] = useState<RunResult | null>(null);
   const [runError, setRunError] = useState("");
+  const [pendingTest, setPendingTest] = useState(false);
 
   // Edit workflow
   const [showEditWorkflow, setShowEditWorkflow] = useState(false);
@@ -111,7 +113,9 @@ export default function WorkflowsPage() {
       qc.invalidateQueries({ queryKey: ["workflows"] });
       setSelected(w as Workflow);
       setShowCreate(false); setNewName(""); setNewDesc("");
+      showToast("Workflow created");
     },
+    onError: (e: Error) => showToast(e.message, "error"),
   });
 
   const updateWorkflow = useMutation({
@@ -129,7 +133,9 @@ export default function WorkflowsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["workflows"] });
       setSelected(null);
+      showToast("Workflow deleted");
     },
+    onError: (e: Error) => showToast(e.message, "error"),
   });
 
   const addStep = useMutation({
@@ -153,13 +159,20 @@ export default function WorkflowsPage() {
       setStepTableId(""); setStepColumn(""); setStepOp("eq");
       setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate("");
       setStepEmailTo(""); setStepEmailSubject(""); setStepError("");
+      setPendingTest(true);
+      showToast("Step added");
     },
     onError: (e: Error) => setStepError(e.message),
   });
 
   const deleteStep = useMutation({
     mutationFn: (stepId: number) => api.delete(`/api/workflows/${selected!.id}/steps/${stepId}/`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["steps", selected?.id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["steps", selected?.id] });
+      setPendingTest(true);
+      showToast("Step deleted");
+    },
+    onError: (e: Error) => showToast(e.message, "error"),
   });
 
   const saveAsTemplate = useMutation({
@@ -183,6 +196,7 @@ export default function WorkflowsPage() {
 
   const runWorkflow = useMutation({
     mutationFn: () => api.post<RunResult>(`/api/workflows/${selected!.id}/run/`, {}),
+    onMutate: () => setPendingTest(false),
     onSuccess: (res) => { setRunResult(res); setRunError(""); },
     onError: (e: Error) => setRunError(e.message),
   });
@@ -213,7 +227,7 @@ export default function WorkflowsPage() {
           {workflows.map((w) => (
             <button
               key={w.id}
-              onClick={() => { setSelected(w); setRunResult(null); setRunError(""); }}
+              onClick={() => { setSelected(w); setRunResult(null); setRunError(""); setPendingTest(false); }}
               className={`text-left px-3 py-1.5 rounded text-sm truncate transition-colors ${
                 selected?.id === w.id
                   ? "bg-[#37373d] text-[#d4d4d4] border-l-2 border-[#007acc]"
@@ -285,7 +299,9 @@ export default function WorkflowsPage() {
                 <button
                   onClick={() => { setRunResult(null); setRunError(""); runWorkflow.mutate(); }}
                   disabled={runWorkflow.isPending}
-                  className="bg-[#1e3a2f] text-[#4ec9b0] border border-[#2a5a3f] rounded px-3 py-1.5 text-sm font-medium hover:bg-[#2a5a3f] disabled:opacity-50 transition-colors"
+                  className={`bg-[#1e3a2f] text-[#4ec9b0] rounded px-3 py-1.5 text-sm font-medium hover:bg-[#2a5a3f] disabled:opacity-50 transition-colors border ${
+                    pendingTest ? "border-[#4ec9b0] ring-2 ring-[#4ec9b0] ring-offset-1 ring-offset-[#1e1e1e] animate-pulse" : "border-[#2a5a3f]"
+                  }`}
                 >
                   {runWorkflow.isPending ? "Running..." : selected.status === "active" ? "▶ Run now" : "▶ Run test"}
                 </button>
@@ -517,6 +533,7 @@ export default function WorkflowsPage() {
                     <option value="ne">≠ not equals</option>
                     <option value="gt">&gt; greater than</option>
                     <option value="lt">&lt; less than</option>
+                    <option value="contains">contains</option>
                   </select>
                   <input placeholder="Value" value={stepValue} onChange={(e) => setStepValue(e.target.value)} className={inputCls} />
                 </div>

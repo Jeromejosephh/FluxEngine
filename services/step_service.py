@@ -51,7 +51,7 @@ class StepService:
                         raise ValidationException(
                             f"Transform filter must include 'column', 'op', and 'value'. Missing: '{key}'"
                         )
-                allowed_ops = {"eq", "ne", "gt", "gte", "lt", "lte"}
+                allowed_ops = {"eq", "ne", "gt", "gte", "lt", "lte", "contains"}
                 if f["op"] not in allowed_ops:
                     raise ValidationException(
                         f"Transform filter op '{f['op']}' not supported. Use: {', '.join(sorted(allowed_ops))}"

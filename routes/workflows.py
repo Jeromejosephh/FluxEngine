@@ -24,7 +24,7 @@ router = APIRouter()
 def _check_workflow_ownership(workflow, user):
     """Raise 404 if editor tries to access another user's workflow."""
     if user.role != "admin" and workflow.created_by != user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow not found")
+        raise NotFoundException("Workflow not found")
 
 
 async def get_current_user_from_token(token: str):
