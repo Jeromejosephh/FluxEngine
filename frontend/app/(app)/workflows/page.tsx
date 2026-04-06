@@ -68,6 +68,8 @@ export default function WorkflowsPage() {
   const [stepWebhook, setStepWebhook] = useState("");
   const [stepTitle, setStepTitle] = useState("");
   const [stepBodyTemplate, setStepBodyTemplate] = useState("");
+  const [stepEmailTo, setStepEmailTo] = useState("");
+  const [stepEmailSubject, setStepEmailSubject] = useState("");
   const [showAddStep, setShowAddStep] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -128,6 +130,7 @@ export default function WorkflowsPage() {
       if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
       if (stepType === "action") config = { webhook_url: stepWebhook };
       if (stepType === "notify") config = { webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate };
+      if (stepType === "email") config = { to: stepEmailTo, subject: stepEmailSubject, body_template: stepBodyTemplate };
       if (stepType === "transform") config = { select_columns: [] };
       return api.post(`/api/workflows/${selected!.id}/steps/`, {
         name: stepName, step_type: stepType,
@@ -138,7 +141,8 @@ export default function WorkflowsPage() {
       qc.invalidateQueries({ queryKey: ["steps", selected?.id] });
       setShowAddStep(false); setStepName(""); setStepType("query");
       setStepTableId(""); setStepColumn(""); setStepOp("eq");
-      setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate(""); setStepError("");
+      setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate("");
+      setStepEmailTo(""); setStepEmailSubject(""); setStepError("");
     },
     onError: (e: Error) => setStepError(e.message),
   });
@@ -469,6 +473,7 @@ export default function WorkflowsPage() {
                   <option value="condition">Condition — filter rows by a rule</option>
                   <option value="action">Action — send raw JSON to a webhook</option>
                   <option value="notify">Notify — send formatted message (ntfy, Slack, etc.)</option>
+                  <option value="email">Email — send formatted email via Gmail</option>
                 </select>
               </div>
 
@@ -499,6 +504,29 @@ export default function WorkflowsPage() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs text-[#858585] uppercase tracking-wide">Webhook URL</label>
                   <input placeholder="https://..." value={stepWebhook} onChange={(e) => setStepWebhook(e.target.value)} className={inputCls} />
+                </div>
+              )}
+
+              {stepType === "email" && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-[#858585] uppercase tracking-wide">To</label>
+                    <input placeholder="recipient@email.com" value={stepEmailTo} onChange={(e) => setStepEmailTo(e.target.value)} className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-[#858585] uppercase tracking-wide">Subject</label>
+                    <input placeholder="e.g. Follow-up Reminder" value={stepEmailSubject} onChange={(e) => setStepEmailSubject(e.target.value)} className={inputCls} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs text-[#858585] uppercase tracking-wide">Message template</label>
+                    <input
+                      placeholder="e.g. {company} | {role} | Due: {follow_up_date}"
+                      value={stepBodyTemplate}
+                      onChange={(e) => setStepBodyTemplate(e.target.value)}
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-[#4e4e4e]">Use {"{"} column_name {"}"} to insert values from each row</p>
+                  </div>
                 </div>
               )}
 

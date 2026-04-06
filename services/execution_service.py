@@ -86,6 +86,8 @@ class ExecutionService:
                 output = self._run_action_step(config, context_rows)
             elif step.step_type == "notify":
                 output = self._run_notify_step(config, context_rows)
+            elif step.step_type == "email":
+                output = self._run_email_step(config, context_rows)
             else:
                 # condition — not yet implemented, pass through
                 output = context_rows
@@ -273,6 +275,62 @@ class ExecutionService:
 
         if status >= 400:
             raise ValueError(f"Notify POST to {webhook_url} returned status {status}")
+
+        return rows
+
+    def _run_email_step(
+        self,
+        config: Dict[str, Any],
+        rows: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Email step — sends a formatted email via SMTP.
+
+        Config shape:
+          {
+            "to": "someone@example.com",
+            "subject": "Follow-up Reminder",
+            "body_template": "{company} | {role} | Due: {follow_up_date}"
+          }
+        """
+        import smtplib
+        from email.mime.text import MIMEText
+        from utils.config import settings
+
+        if not settings.SMTP_EMAIL or not settings.SMTP_PASSWORD:
+            raise ValueError("SMTP credentials not configured. Set SMTP_EMAIL and SMTP_PASSWORD environment variables.")
+
+        to = config["to"]
+        subject = config.get("subject", "FluxEngine Notification")
+        body_template = config.get("body_template", "")
+
+        if not rows:
+            return rows
+
+        if body_template:
+            lines = []
+            for row in rows:
+                safe_row = {k: str(v) for k, v in row.items() if not k.startswith("_")}
+                try:
+                    lines.append(body_template.format(**safe_row))
+                except KeyError:
+                    lines.append(str(safe_row))
+            body = "\n".join(lines)
+        else:
+            body = "\n".join(
+                " | ".join(f"{k}: {v}" for k, v in row.items() if not k.startswith("_"))
+                for row in rows
+            )
+
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"] = settings.SMTP_EMAIL
+        msg["To"] = to
+
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+            server.starttls()
+            server.login(settings.SMTP_EMAIL, settings.SMTP_PASSWORD)
+            server.sendmail(settings.SMTP_EMAIL, [to], msg.as_string())
 
         return rows
 

@@ -29,6 +29,12 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
 
+    # SMTP settings
+    SMTP_EMAIL: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

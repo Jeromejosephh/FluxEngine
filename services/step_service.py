@@ -18,6 +18,7 @@ class StepService:
         "condition": [],
         "action": ["webhook_url"],
         "notify": ["webhook_url"],
+        "email": ["to"],
     }
 
     def __init__(self):
