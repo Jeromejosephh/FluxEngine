@@ -252,7 +252,7 @@ async def update_workflow_step(
     step_service = StepService()
     try:
         _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
-        return step_service.update_step(workflow_id, step_id, step_data)
+        return _step_to_response(step_service.update_step(workflow_id, step_id, step_data))
     except ValidationException as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
     except NotFoundException as e:
