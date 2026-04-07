@@ -37,10 +37,10 @@ def validate_cron(cron_expr: str) -> None:
         )
 
 
-def _compute_next_run(cron_expr: str) -> Optional[datetime]:
-    """Return the next fire time for the given cron expression."""
+def _compute_next_run(cron_expr: str, tz: str = "UTC") -> Optional[datetime]:
+    """Return the next fire time for the given cron expression in the given timezone."""
     try:
-        trigger = CronTrigger.from_crontab(cron_expr, timezone="UTC")
+        trigger = CronTrigger.from_crontab(cron_expr, timezone=tz)
         return trigger.get_next_fire_time(None, datetime.now(timezone.utc))
     except Exception:
         return None
@@ -63,9 +63,8 @@ def _run_scheduled_workflow(workflow_id: int, user_id: int) -> None:
         return
 
     now = datetime.now(timezone.utc)
-    next_run = _compute_next_run(
-        db.get_schedule_by_workflow(workflow_id).cron_expr
-    ) if db.get_schedule_by_workflow(workflow_id) else None
+    sched = db.get_schedule_by_workflow(workflow_id)
+    next_run = _compute_next_run(sched.cron_expr, sched.timezone) if sched else None
     try:
         db.update_schedule_last_run(workflow_id, now, next_run)
     except Exception as exc:
@@ -90,7 +89,7 @@ def start_scheduler() -> None:
         workflow = db.get_workflow_by_id(sched.workflow_id)
         if not workflow:
             continue
-        _register_job(scheduler, sched.workflow_id, sched.cron_expr, workflow.created_by)
+        _register_job(scheduler, sched.workflow_id, sched.cron_expr, workflow.created_by, sched.timezone)
 
     scheduler.start()
     logger.info("Scheduler started with %d job(s)", len(schedules))
@@ -114,9 +113,10 @@ def _register_job(
     workflow_id: int,
     cron_expr: str,
     user_id: int,
+    tz: str = "UTC",
 ) -> None:
     job_id = _job_id(workflow_id)
-    trigger = CronTrigger.from_crontab(cron_expr, timezone="UTC")
+    trigger = CronTrigger.from_crontab(cron_expr, timezone=tz)
     scheduler.add_job(
         _run_scheduled_workflow,
         trigger=trigger,
@@ -127,9 +127,9 @@ def _register_job(
     )
 
 
-def add_or_replace_job(workflow_id: int, cron_expr: str, user_id: int) -> None:
+def add_or_replace_job(workflow_id: int, cron_expr: str, user_id: int, tz: str = "UTC") -> None:
     """Add or replace the APScheduler job for a workflow schedule."""
-    _register_job(get_scheduler(), workflow_id, cron_expr, user_id)
+    _register_job(get_scheduler(), workflow_id, cron_expr, user_id, tz)
 
 
 def remove_job(workflow_id: int) -> None:

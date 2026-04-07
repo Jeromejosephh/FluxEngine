@@ -8,12 +8,14 @@ class ScheduleCreate(BaseModel):
     """Schema for creating or replacing a workflow schedule"""
     cron_expr: str = Field(..., description="5-field cron expression, e.g. '0 * * * *'")
     is_enabled: bool = True
+    timezone: str = "UTC"
 
 
 class ScheduleUpdate(BaseModel):
     """Schema for partially updating a schedule"""
     cron_expr: Optional[str] = None
     is_enabled: Optional[bool] = None
+    timezone: Optional[str] = None
 
 
 class ScheduleResponse(BaseModel):
@@ -23,6 +25,7 @@ class ScheduleResponse(BaseModel):
     cron_expr: str
     is_enabled: bool
     created_by: int
+    timezone: str = "UTC"
     created_at: datetime
     updated_at: Optional[datetime] = None
     last_run_at: Optional[datetime] = None

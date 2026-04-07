@@ -15,7 +15,7 @@ interface Step {
   config: Record<string, unknown>; order: number; workflow_id: number;
 }
 interface Table { id: number; name: string; }
-interface Schedule { cron_expr: string; is_enabled: boolean; next_run_at: string | null; }
+interface Schedule { cron_expr: string; is_enabled: boolean; timezone: string; next_run_at: string | null; }
 interface StepResult { step_id: number; step_name: string; step_type: string; success: boolean; rows_out: number; error?: string; }
 interface RunResult { success: boolean; workflow_name: string; error?: string; steps: StepResult[]; }
 
@@ -65,7 +65,13 @@ export default function WorkflowsPage() {
 
   // Schedule
   const [showSchedule, setShowSchedule] = useState(false);
-  const [cronExpr, setCronExpr] = useState("0 9 * * *");
+  const [schedHour, setSchedHour] = useState(9);
+  const [schedMinute, setSchedMinute] = useState(0);
+  const [schedAmPm, setSchedAmPm] = useState<"AM" | "PM">("AM");
+  const [schedDays, setSchedDays] = useState<"everyday" | number[]>("everyday");
+  const [schedTimezone, setSchedTimezone] = useState(
+    typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC"
+  );
   const [scheduleEnabled, setScheduleEnabled] = useState(true);
   const [scheduleError, setScheduleError] = useState("");
 
@@ -201,9 +207,53 @@ export default function WorkflowsPage() {
     onError: (e: Error) => setRunError(e.message),
   });
 
+  function buildCron(): string {
+    const h24 = schedAmPm === "AM"
+      ? (schedHour === 12 ? 0 : schedHour)
+      : (schedHour === 12 ? 12 : schedHour + 12);
+    const dayField = schedDays === "everyday" ? "*" : (schedDays as number[]).join(",");
+    return `${schedMinute} ${h24} * * ${dayField}`;
+  }
+
+  function describeSchedule(cron: string, tz: string): string {
+    const parts = cron.split(" ");
+    if (parts.length !== 5) return cron;
+    const [min, hr, , , dow] = parts;
+    const h = parseInt(hr);
+    const ampm = h < 12 ? "AM" : "PM";
+    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const minStr = parseInt(min) === 0 ? "" : `:${min.padStart(2, "0")}`;
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const dayStr = dow === "*" ? "every day" : dow.split(",").map((d) => dayNames[parseInt(d)] ?? d).join(", ");
+    const tzLabel = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
+    return `${h12}${minStr} ${ampm} - ${dayStr} - ${tzLabel}`;
+  }
+
+  function openScheduleModal() {
+    if (schedule) {
+      // parse existing cron back to UI state
+      const parts = schedule.cron_expr.split(" ");
+      if (parts.length === 5) {
+        const h = parseInt(parts[1]);
+        setSchedAmPm(h < 12 ? "AM" : "PM");
+        setSchedHour(h === 0 ? 12 : h > 12 ? h - 12 : h);
+        setSchedMinute(parseInt(parts[0]));
+        setSchedDays(parts[4] === "*" ? "everyday" : parts[4].split(",").map(Number));
+      }
+      setSchedTimezone(schedule.timezone || "UTC");
+      setScheduleEnabled(schedule.is_enabled);
+    }
+    setScheduleError("");
+    setShowSchedule(true);
+  }
+
   const saveSchedule = useMutation({
     mutationFn: () =>
-      api.post(`/api/workflows/${selected!.id}/schedule/`, { cron_expr: cronExpr, is_enabled: scheduleEnabled }),
+      api.post(`/api/workflows/${selected!.id}/schedule/`, {
+        cron_expr: buildCron(),
+        is_enabled: scheduleEnabled,
+        timezone: schedTimezone,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["schedule", selected?.id] });
       setShowSchedule(false);
@@ -280,13 +330,7 @@ export default function WorkflowsPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => {
-                    if (schedule) {
-                      setCronExpr(schedule.cron_expr);
-                      setScheduleEnabled(schedule.is_enabled);
-                    }
-                    setShowSchedule(true);
-                  }}
+                  onClick={openScheduleModal}
                   className={btnSecondary}
                 >
                   Schedule
@@ -316,8 +360,8 @@ export default function WorkflowsPage() {
               <div className="mb-4 px-3 py-2 rounded border border-[#3e3e42] bg-[#2d2d2d] flex items-center gap-3">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${schedule.is_enabled ? "bg-[#4ec9b0]" : "bg-[#858585]"}`} />
                 <span className="text-xs text-[#858585]">
-                  Schedule: <span className="font-mono text-[#d4d4d4]">{schedule.cron_expr}</span>
-                  {schedule.next_run_at && (
+                  {schedule.is_enabled ? describeSchedule(schedule.cron_expr, schedule.timezone) : "Schedule disabled"}
+                  {schedule.next_run_at && schedule.is_enabled && (
                     <span className="ml-2">· Next: {new Date(schedule.next_run_at).toLocaleString()}</span>
                   )}
                 </span>
@@ -435,30 +479,118 @@ export default function WorkflowsPage() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-sm">
             <h2 className="font-semibold text-[#d4d4d4] mb-1">Schedule workflow</h2>
-            <p className="text-xs text-[#858585] mb-4">Standard 5-field cron expression</p>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-[#858585] uppercase tracking-wide">Cron expression</label>
-                <input
-                  placeholder="0 9 * * *"
-                  value={cronExpr}
-                  onChange={(e) => setCronExpr(e.target.value)}
-                  className={`${inputCls} font-mono`}
-                />
-                <p className="text-xs text-[#4e4e4e]">e.g. <span className="font-mono">0 9 * * *</span> = daily at 9am · <span className="font-mono">0 9 * * 1</span> = Mondays at 9am</p>
+            <p className="text-xs text-[#858585] mb-4">Runs automatically at the time you set.</p>
+            <div className="flex flex-col gap-4">
+
+              {/* Time row */}
+              <div>
+                <label className="block text-xs text-[#858585] mb-1.5">Time</label>
+                <div className="flex gap-2 items-center">
+                  <select value={schedHour} onChange={(e) => setSchedHour(Number(e.target.value))}
+                    className="bg-[#3c3c3c] border border-[#3e3e42] rounded px-2 py-2 text-sm text-[#d4d4d4] focus:outline-none focus:border-[#007acc]">
+                    {[12,1,2,3,4,5,6,7,8,9,10,11].map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <span className="text-[#858585] text-sm">:</span>
+                  <select value={schedMinute} onChange={(e) => setSchedMinute(Number(e.target.value))}
+                    className="bg-[#3c3c3c] border border-[#3e3e42] rounded px-2 py-2 text-sm text-[#d4d4d4] focus:outline-none focus:border-[#007acc]">
+                    {[0,15,30,45].map((m) => (
+                      <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
+                    ))}
+                  </select>
+                  <select value={schedAmPm} onChange={(e) => setSchedAmPm(e.target.value as "AM" | "PM")}
+                    className="bg-[#3c3c3c] border border-[#3e3e42] rounded px-2 py-2 text-sm text-[#d4d4d4] focus:outline-none focus:border-[#007acc]">
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
               </div>
+
+              {/* Days row */}
+              <div>
+                <label className="block text-xs text-[#858585] mb-1.5">Days</label>
+                <div className="flex gap-1.5 flex-wrap">
+                  {["Every day", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, i) => {
+                    const isEvery = label === "Every day";
+                    const dayNum = i; // 0=Every day offset, 1=Mon(1), 2=Tue(2) ... 7=Sun(0)
+                    const cronDay = i === 7 ? 0 : i; // Sun=0
+                    const isActive = isEvery
+                      ? schedDays === "everyday"
+                      : Array.isArray(schedDays) && schedDays.includes(cronDay);
+                    return (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          if (isEvery) { setSchedDays("everyday"); return; }
+                          if (schedDays === "everyday") { setSchedDays([cronDay]); return; }
+                          const arr = schedDays as number[];
+                          setSchedDays(arr.includes(cronDay)
+                            ? arr.filter((d) => d !== cronDay).length === 0 ? "everyday" : arr.filter((d) => d !== cronDay)
+                            : [...arr, cronDay].sort());
+                        }}
+                        className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                          isActive ? "bg-[#007acc] text-white" : "bg-[#3c3c3c] text-[#858585] hover:text-[#d4d4d4]"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Timezone */}
+              <div>
+                <label className="block text-xs text-[#858585] mb-1.5">Timezone</label>
+                <select value={schedTimezone} onChange={(e) => setSchedTimezone(e.target.value)}
+                  className="bg-[#3c3c3c] border border-[#3e3e42] rounded px-2 py-2 text-sm text-[#d4d4d4] focus:outline-none focus:border-[#007acc] w-full">
+                  {[
+                    ["Pacific/Auckland", "New Zealand (Auckland)"],
+                    ["Pacific/Chatham", "New Zealand (Chatham Islands)"],
+                    ["Australia/Sydney", "Australia (Sydney)"],
+                    ["Australia/Melbourne", "Australia (Melbourne)"],
+                    ["Australia/Brisbane", "Australia (Brisbane)"],
+                    ["Australia/Adelaide", "Australia (Adelaide)"],
+                    ["Australia/Perth", "Australia (Perth)"],
+                    ["Asia/Tokyo", "Japan (Tokyo)"],
+                    ["Asia/Seoul", "South Korea (Seoul)"],
+                    ["Asia/Shanghai", "China (Shanghai)"],
+                    ["Asia/Singapore", "Singapore"],
+                    ["Asia/Bangkok", "Thailand (Bangkok)"],
+                    ["Asia/Kolkata", "India (Kolkata)"],
+                    ["Asia/Dubai", "UAE (Dubai)"],
+                    ["Europe/London", "UK (London)"],
+                    ["Europe/Paris", "France (Paris)"],
+                    ["Europe/Berlin", "Germany (Berlin)"],
+                    ["Europe/Moscow", "Russia (Moscow)"],
+                    ["Africa/Johannesburg", "South Africa (Johannesburg)"],
+                    ["America/New_York", "US Eastern (New York)"],
+                    ["America/Chicago", "US Central (Chicago)"],
+                    ["America/Denver", "US Mountain (Denver)"],
+                    ["America/Los_Angeles", "US Pacific (Los Angeles)"],
+                    ["America/Toronto", "Canada (Toronto)"],
+                    ["America/Vancouver", "Canada (Vancouver)"],
+                    ["America/Sao_Paulo", "Brazil (Sao Paulo)"],
+                    ["UTC", "UTC"],
+                  ].map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Enabled toggle */}
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={scheduleEnabled}
+                <input type="checkbox" checked={scheduleEnabled}
                   onChange={(e) => setScheduleEnabled(e.target.checked)}
-                  className="accent-[#007acc]"
-                />
+                  className="accent-[#007acc]" />
                 <span className="text-sm text-[#d4d4d4]">Enabled</span>
               </label>
+
               {scheduleError && <p className="text-sm text-[#f14c4c]">{scheduleError}</p>}
               <div className="flex gap-2 pt-1">
-                <button onClick={() => saveSchedule.mutate()} disabled={!cronExpr || saveSchedule.isPending} className={`flex-1 ${btnPrimary}`}>
+                <button onClick={() => saveSchedule.mutate()} disabled={saveSchedule.isPending} className={`flex-1 ${btnPrimary}`}>
                   {saveSchedule.isPending ? "Saving..." : "Save schedule"}
                 </button>
                 <button onClick={() => setShowSchedule(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>

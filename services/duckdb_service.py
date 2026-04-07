@@ -205,6 +205,7 @@ class DuckDBService:
                 cron_expr VARCHAR NOT NULL,
                 is_enabled BOOLEAN DEFAULT TRUE,
                 created_by INTEGER NOT NULL,
+                timezone VARCHAR DEFAULT 'UTC',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_run_at TIMESTAMP,
@@ -247,6 +248,12 @@ class DuckDBService:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_executions_workflow_id ON executions(workflow_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_schedules_workflow_id ON schedules(workflow_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_templates_created_by ON workflow_templates(created_by)")
+
+        # Migrations: add columns to existing tables if not present
+        try:
+            conn.execute("ALTER TABLE schedules ADD COLUMN timezone VARCHAR DEFAULT 'UTC'")
+        except Exception:
+            pass  # column already exists
 
         # Inbound webhooks table
         conn.execute("CREATE SEQUENCE IF NOT EXISTS seq_inbound_webhooks_id START 1")
@@ -1084,6 +1091,7 @@ class DuckDBService:
             cron_expr=row["cron_expr"],
             is_enabled=row["is_enabled"],
             created_by=row["created_by"],
+            timezone=row.get("timezone") or "UTC",
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             last_run_at=row["last_run_at"],
@@ -1097,18 +1105,19 @@ class DuckDBService:
         is_enabled: bool,
         created_by: int,
         next_run_at=None,
+        timezone: str = "UTC",
     ) -> Schedule:
         """Insert a new schedule row. One schedule per workflow (UNIQUE on workflow_id)."""
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        from datetime import datetime, timezone as tz
+        now = datetime.now(tz.utc)
         query = """
             INSERT INTO schedules
-                (workflow_id, cron_expr, is_enabled, created_by, created_at, updated_at, next_run_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            RETURNING id, workflow_id, cron_expr, is_enabled, created_by,
+                (workflow_id, cron_expr, is_enabled, created_by, timezone, created_at, updated_at, next_run_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            RETURNING id, workflow_id, cron_expr, is_enabled, created_by, timezone,
                       created_at, updated_at, last_run_at, next_run_at
         """
-        result = self.execute(query, (workflow_id, cron_expr, is_enabled, created_by, now, now, next_run_at))
+        result = self.execute(query, (workflow_id, cron_expr, is_enabled, created_by, timezone, now, now, next_run_at))
         return self._row_to_schedule(result[0])
 
     def get_schedule_by_workflow(self, workflow_id: int) -> Optional[Schedule]:
@@ -1130,9 +1139,10 @@ class DuckDBService:
         cron_expr: Optional[str] = None,
         is_enabled: Optional[bool] = None,
         next_run_at=None,
+        timezone: Optional[str] = None,
     ) -> Optional[Schedule]:
         """Partially update a schedule row. Returns None if not found."""
-        from datetime import datetime, timezone
+        from datetime import datetime, timezone as tz
         existing = self.get_schedule_by_workflow(workflow_id)
         if not existing:
             return None
@@ -1140,15 +1150,16 @@ class DuckDBService:
         new_cron = cron_expr if cron_expr is not None else existing.cron_expr
         new_enabled = is_enabled if is_enabled is not None else existing.is_enabled
         new_next = next_run_at if next_run_at is not None else existing.next_run_at
-        now = datetime.now(timezone.utc)
+        new_tz = timezone if timezone is not None else existing.timezone
+        now = datetime.now(tz.utc)
 
         self.execute(
             """
             UPDATE schedules
-            SET cron_expr = ?, is_enabled = ?, next_run_at = ?, updated_at = ?
+            SET cron_expr = ?, is_enabled = ?, next_run_at = ?, timezone = ?, updated_at = ?
             WHERE workflow_id = ?
             """,
-            (new_cron, new_enabled, new_next, now, workflow_id)
+            (new_cron, new_enabled, new_next, new_tz, now, workflow_id)
         )
         return self.get_schedule_by_workflow(workflow_id)
 

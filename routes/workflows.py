@@ -390,7 +390,7 @@ async def create_schedule(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
 
     db = DuckDBService()
-    next_run = _compute_next_run(data.cron_expr) if data.is_enabled else None
+    next_run = _compute_next_run(data.cron_expr, data.timezone) if data.is_enabled else None
     existing = db.get_schedule_by_workflow(workflow_id)
 
     if existing:
@@ -399,6 +399,7 @@ async def create_schedule(
             cron_expr=data.cron_expr,
             is_enabled=data.is_enabled,
             next_run_at=next_run,
+            timezone=data.timezone,
         )
     else:
         schedule = db.create_schedule(
@@ -407,10 +408,11 @@ async def create_schedule(
             is_enabled=data.is_enabled,
             created_by=user.id,
             next_run_at=next_run,
+            timezone=data.timezone,
         )
 
     if data.is_enabled:
-        add_or_replace_job(workflow_id, data.cron_expr, user.id)
+        add_or_replace_job(workflow_id, data.cron_expr, user.id, data.timezone)
     else:
         remove_job(workflow_id)
 

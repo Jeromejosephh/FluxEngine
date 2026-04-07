@@ -12,6 +12,7 @@ class Schedule:
     cron_expr: str          # standard 5-field cron (e.g. "0 * * * *")
     is_enabled: bool
     created_by: int         # user who created the schedule
+    timezone: str = "UTC"   # IANA timezone name (e.g. "Pacific/Auckland")
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_run_at: Optional[datetime] = None
