@@ -153,6 +153,22 @@ class StepService:
             raise NotFoundException(f"Workflow with ID {workflow_id} not found")
         return self.db_service.get_steps_by_workflow(workflow_id)
 
+    def update_step(self, workflow_id: int, step_id: int, data: "StepUpdate") -> "Step":
+        """Update a step's name and/or config."""
+        import json as _json
+        from schemas.step import StepUpdate
+        step = self.db_service.get_step_by_id(step_id)
+        if not step or step.workflow_id != workflow_id:
+            raise NotFoundException(f"Step with ID {step_id} not found in workflow {workflow_id}")
+        new_config = data.config if data.config is not None else (step.config if isinstance(step.config, dict) else _json.loads(step.config))
+        step_type = step.step_type
+        self.validate_step_config(step_type, new_config)
+        config_str = _json.dumps(new_config)
+        updated = self.db_service.update_step(step_id, name=data.name, config=config_str)
+        if not updated:
+            raise NotFoundException(f"Step {step_id} not found")
+        return updated
+
     def delete_step(self, workflow_id: int, step_id: int) -> None:
         """
         Delete a step from a workflow.

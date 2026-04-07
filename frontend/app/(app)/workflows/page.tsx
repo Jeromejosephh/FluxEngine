@@ -95,6 +95,7 @@ export default function WorkflowsPage() {
   const [emailHeaderText, setEmailHeaderText] = useState("");
   const [emailFooterText, setEmailFooterText] = useState("Sent by FluxEngine");
   const [showAddStep, setShowAddStep] = useState(false);
+  const [editingStep, setEditingStep] = useState<Step | null>(null);
   const [stepError, setStepError] = useState("");
 
   const { data: workflows = [], isLoading, isError } = useQuery<Workflow[]>({
@@ -209,6 +210,72 @@ export default function WorkflowsPage() {
     },
     onError: (e: Error) => showToast(e.message, "error"),
   });
+
+  const updateStep = useMutation({
+    mutationFn: () => {
+      let config: Record<string, unknown> = {};
+      let dbStepType = stepType;
+      if (stepType === "query") config = { table_id: Number(stepTableId) };
+      if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
+      if (stepType === "action") config = { webhook_url: stepWebhook };
+      if (stepType === "notify") { config = { subtype: "notify", webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate }; dbStepType = "action"; }
+      if (stepType === "email") {
+        config = {
+          subtype: "email", to: stepEmailTo, subject: stepEmailSubject,
+          body_template: stepBodyTemplate, html_body: stepHtmlMode,
+          ...(stepHtmlMode && { style: {
+            accent_color: emailAccentColor, bg_color: emailBgColor, text_color: emailTextColor,
+            header_text: emailHeaderText, footer_text: emailFooterText,
+          }}),
+        };
+        dbStepType = "action";
+      }
+      if (stepType === "transform") config = { select_columns: [] };
+      return api.put(`/api/workflows/${selected!.id}/steps/${editingStep!.id}/`, { name: stepName, step_type: dbStepType, config });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["steps", selected?.id] });
+      setEditingStep(null); setStepName(""); setStepType("query");
+      setStepTableId(""); setStepColumn(""); setStepOp("eq");
+      setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate("");
+      setStepEmailTo(""); setStepEmailSubject(""); setStepHtmlMode(false);
+      setEmailAccentColor("#007acc"); setEmailBgColor("#f0f4f8"); setEmailTextColor("#333333");
+      setEmailHeaderText(""); setEmailFooterText("Sent by FluxEngine"); setStepError("");
+      setPendingTest(true);
+      showToast("Step updated");
+    },
+    onError: (e: Error) => setStepError(e.message),
+  });
+
+  function openEditStep(step: Step) {
+    const cfg = step.config as Record<string, unknown>;
+    const sub = cfg.subtype as string | undefined;
+    // determine UI stepType
+    let uiType = step.step_type;
+    if (step.step_type === "action") uiType = sub === "email" ? "email" : sub === "notify" ? "notify" : "action";
+    setStepType(uiType);
+    setStepName(step.name);
+    if (uiType === "query") setStepTableId(String(cfg.table_id ?? ""));
+    if (uiType === "condition") { setStepColumn(String(cfg.column ?? "")); setStepOp(String(cfg.op ?? "eq")); setStepValue(String(cfg.value ?? "")); }
+    if (uiType === "action") setStepWebhook(String(cfg.webhook_url ?? ""));
+    if (uiType === "notify") { setStepWebhook(String(cfg.webhook_url ?? "")); setStepTitle(String(cfg.title ?? "")); setStepBodyTemplate(String(cfg.body_template ?? "")); }
+    if (uiType === "email") {
+      setStepEmailTo(String(cfg.to ?? ""));
+      setStepEmailSubject(String(cfg.subject ?? ""));
+      setStepBodyTemplate(String(cfg.body_template ?? ""));
+      setStepHtmlMode(!!cfg.html_body);
+      const s = cfg.style as Record<string, string> | undefined;
+      if (s) {
+        setEmailAccentColor(s.accent_color ?? "#007acc");
+        setEmailBgColor(s.bg_color ?? "#f0f4f8");
+        setEmailTextColor(s.text_color ?? "#333333");
+        setEmailHeaderText(s.header_text ?? "");
+        setEmailFooterText(s.footer_text ?? "Sent by FluxEngine");
+      }
+    }
+    setStepError("");
+    setEditingStep(step);
+  }
 
   const saveAsTemplate = useMutation({
     mutationFn: () =>
@@ -425,12 +492,8 @@ export default function WorkflowsPage() {
                         {STEP_LABELS[step.step_type] ?? step.step_type.toUpperCase()}
                       </span>
                       <span className="text-sm text-[#d4d4d4] font-medium flex-1">{step.name}</span>
-                      <button
-                        onClick={() => deleteStep.mutate(step.id)}
-                        className="text-xs text-[#858585] hover:text-[#f14c4c]"
-                      >
-                        Delete
-                      </button>
+                      <button onClick={() => openEditStep(step)} className="text-xs text-[#858585] hover:text-[#007acc]">Edit</button>
+                      <button onClick={() => deleteStep.mutate(step.id)} className="text-xs text-[#858585] hover:text-[#f14c4c]">Delete</button>
                     </div>
                     <p className="text-xs text-[#4e4e4e] mt-1 ml-6 font-mono">
                       {JSON.stringify(step.config)}
@@ -671,23 +734,25 @@ export default function WorkflowsPage() {
         </div>
       )}
 
-      {/* Add step modal */}
-      {showAddStep && (
+      {/* Add / Edit step modal */}
+      {(showAddStep || editingStep) && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
           <div className="bg-[#252526] border border-[#3e3e42] rounded-lg p-6 w-full max-w-md">
-            <h2 className="font-semibold text-[#d4d4d4] mb-4">Add step</h2>
+            <h2 className="font-semibold text-[#d4d4d4] mb-4">{editingStep ? "Edit step" : "Add step"}</h2>
             <div className="flex flex-col gap-3">
               <input placeholder="Step name" value={stepName} onChange={(e) => setStepName(e.target.value)} className={inputCls} />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs text-[#858585] uppercase tracking-wide">Type</label>
-                <select value={stepType} onChange={(e) => setStepType(e.target.value)} className={inputCls}>
-                  <option value="query">GET - fetch rows from a table</option>
-                  <option value="condition">IF - filter rows by a rule</option>
-                  <option value="action">THEN - send raw JSON to a webhook</option>
-                  <option value="notify">THEN - send formatted message (ntfy, Slack, etc.)</option>
-                  <option value="email">THEN - send formatted email</option>
-                </select>
-              </div>
+              {!editingStep && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-[#858585] uppercase tracking-wide">Type</label>
+                  <select value={stepType} onChange={(e) => setStepType(e.target.value)} className={inputCls}>
+                    <option value="query">GET - fetch rows from a table</option>
+                    <option value="condition">IF - filter rows by a rule</option>
+                    <option value="action">THEN - send raw JSON to a webhook</option>
+                    <option value="notify">THEN - send formatted message (ntfy, Slack, etc.)</option>
+                    <option value="email">THEN - send formatted email</option>
+                  </select>
+                </div>
+              )}
 
               {stepType === "query" && (
                 <div className="flex flex-col gap-1.5">
@@ -844,10 +909,16 @@ export default function WorkflowsPage() {
 
               {stepError && <p className="text-sm text-[#f14c4c]">{stepError}</p>}
               <div className="flex gap-2 pt-1">
-                <button onClick={() => addStep.mutate()} disabled={!stepName || addStep.isPending} className={`flex-1 ${btnPrimary}`}>
-                  {addStep.isPending ? "Adding..." : "Add step"}
-                </button>
-                <button onClick={() => setShowAddStep(false)} className={`flex-1 ${btnSecondary}`}>Cancel</button>
+                {editingStep ? (
+                  <button onClick={() => updateStep.mutate()} disabled={!stepName || updateStep.isPending} className={`flex-1 ${btnPrimary}`}>
+                    {updateStep.isPending ? "Saving..." : "Save changes"}
+                  </button>
+                ) : (
+                  <button onClick={() => addStep.mutate()} disabled={!stepName || addStep.isPending} className={`flex-1 ${btnPrimary}`}>
+                    {addStep.isPending ? "Adding..." : "Add step"}
+                  </button>
+                )}
+                <button onClick={() => { setShowAddStep(false); setEditingStep(null); setStepError(""); }} className={`flex-1 ${btnSecondary}`}>Cancel</button>
               </div>
             </div>
           </div>

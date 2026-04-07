@@ -1072,6 +1072,21 @@ class DuckDBService:
             is_active=row["is_active"]
         )
 
+    def update_step(self, step_id: int, name: Optional[str] = None, config: Optional[str] = None) -> Optional[Step]:
+        """Update step name and/or config. Returns updated step or None if not found."""
+        from datetime import datetime, timezone
+        step = self.get_step_by_id(step_id)
+        if not step:
+            return None
+        new_name = name if name is not None else step.name
+        new_config = config if config is not None else (step.config if isinstance(step.config, str) else json.dumps(step.config))
+        now = datetime.now(timezone.utc)
+        self.execute(
+            "UPDATE steps SET name = ?, config = ?, updated_at = ? WHERE id = ? AND is_active = TRUE",
+            (new_name, new_config, now, step_id)
+        )
+        return self.get_step_by_id(step_id)
+
     def delete_step(self, step_id: int) -> bool:
         """Soft-delete a step by ID. Returns True if deleted, False if not found."""
         result = self.execute(

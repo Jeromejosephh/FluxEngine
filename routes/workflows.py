@@ -5,7 +5,7 @@ from typing import List
 from utils.limiter import limiter
 
 from schemas.workflow import WorkflowCreate, WorkflowUpdate, WorkflowResponse
-from schemas.step import StepCreate, StepResponse
+from schemas.step import StepCreate, StepUpdate, StepResponse
 from schemas.execution import ExecutionResult, ExecutionSummary
 from schemas.schedule import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from schemas.analytics import WorkflowAnalytics
@@ -233,6 +233,28 @@ async def list_workflow_steps(
         _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
         steps = step_service.get_steps_for_workflow(workflow_id)
         return [_step_to_response(s) for s in steps]
+    except NotFoundException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.put("/{workflow_id}/steps/{step_id}", response_model=StepResponse)
+async def update_workflow_step(
+    workflow_id: int,
+    step_id: int,
+    step_data: StepUpdate,
+    token: str = Depends(oauth2_scheme),
+    _: None = Depends(require_role(["admin", "editor"]))
+):
+    """Update a step's name and/or config."""
+    user = await get_current_user_from_token(token)
+    step_service = StepService()
+    try:
+        _check_workflow_ownership(WorkflowService().get_workflow_by_id(workflow_id), user)
+        return step_service.update_step(workflow_id, step_id, step_data)
+    except ValidationException as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.detail)
     except NotFoundException as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=e.detail)
     except Exception as e:
