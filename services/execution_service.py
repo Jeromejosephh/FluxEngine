@@ -402,10 +402,45 @@ class ExecutionService:
             '</table></td></tr></table></body></html>'
         )
 
+    # Date formats tried in order when comparing a date cell against a string filter value.
+    # Supports DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY, etc.
+    _DATE_FORMATS = [
+        "%d-%m-%Y", "%d/%m/%Y",   # UK/EU: 03-03-2025, 03/03/2025
+        "%Y-%m-%d",                # ISO:  2025-03-03
+        "%m/%d/%Y",                # US:   03/03/2025
+        "%d-%m-%y", "%d/%m/%y",   # short year: 03-03-25
+    ]
+
     @staticmethod
     def _apply_op(cell_value: Any, op: str, target: Any) -> bool:
         """Evaluate a single filter condition."""
+        from datetime import date as _date, datetime as _datetime
         try:
+            # When comparing a date/datetime cell against a string target,
+            # try to parse the target in multiple formats so users can write
+            # "03-03-2025" (DD-MM-YYYY) instead of the ISO "2025-03-03".
+            if hasattr(cell_value, "isoformat") and isinstance(target, str):
+                cell_date = cell_value.date() if isinstance(cell_value, _datetime) else cell_value
+                for fmt in ExecutionService._DATE_FORMATS:
+                    try:
+                        target_date = _datetime.strptime(target, fmt).date()
+                        if op == "eq":
+                            return cell_date == target_date
+                        if op == "ne":
+                            return cell_date != target_date
+                        if op == "gt":
+                            return cell_date > target_date
+                        if op == "gte":
+                            return cell_date >= target_date
+                        if op == "lt":
+                            return cell_date < target_date
+                        if op == "lte":
+                            return cell_date <= target_date
+                    except ValueError:
+                        continue
+                # No format matched — fall back to ISO string comparison
+                cell_value = cell_value.isoformat()
+
             # Case-insensitive comparison for strings
             if isinstance(cell_value, str) and isinstance(target, str):
                 if op == "eq":

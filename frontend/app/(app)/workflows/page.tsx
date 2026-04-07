@@ -20,11 +20,6 @@ interface Schedule { cron_expr: string; is_enabled: boolean; timezone: string; n
 interface StepResult { step_id: number; step_name: string; step_type: string; success: boolean; rows_out: number; error?: string; }
 interface RunResult { success: boolean; workflow_name: string; error?: string; steps: StepResult[]; }
 
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-[#37373d] text-[#858585]",
-  active: "bg-[#1e3a2f] text-[#4ec9b0]",
-  archived: "bg-[#3a1e1e] text-[#f14c4c]",
-};
 
 const STEP_COLORS: Record<string, string> = {
   query: "bg-[#1e2a3a] text-[#569cd6]",
@@ -411,9 +406,6 @@ export default function WorkflowsPage() {
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <h1 className="text-base font-semibold text-[#d4d4d4]">{selected.name}</h1>
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[selected.status]}`}>
-                  {selected.status}
-                </span>
               </div>
               <div className="flex gap-2">
                 <button
@@ -444,11 +436,6 @@ export default function WorkflowsPage() {
                 >
                   Schedule
                 </button>
-                {selected.status === "draft" && (
-                  <button onClick={() => updateWorkflow.mutate({ status: "active" })} className={btnSecondary}>
-                    Activate
-                  </button>
-                )}
                 <button
                   onClick={() => { setRunResult(null); setRunError(""); runWorkflow.mutate(); }}
                   disabled={runWorkflow.isPending}
@@ -456,7 +443,7 @@ export default function WorkflowsPage() {
                     pendingTest ? "border-[#4ec9b0] ring-2 ring-[#4ec9b0] ring-offset-1 ring-offset-[#1e1e1e] animate-pulse" : "border-[#2a5a3f]"
                   }`}
                 >
-                  {runWorkflow.isPending ? "Running..." : selected.status === "active" ? "▶ Run now" : "▶ Run test"}
+                  {runWorkflow.isPending ? "Running..." : "▶ Run"}
                 </button>
                 <button onClick={() => deleteWorkflow.mutate(selected.id)} className="text-sm text-[#f14c4c] hover:text-red-400 px-2 py-1.5">
                   Delete
