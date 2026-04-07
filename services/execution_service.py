@@ -298,35 +298,43 @@ class ExecutionService:
         subject = config.get("subject", "FluxEngine Notification")
         body_template = config.get("body_template", "")
         html_mode = config.get("html_body", False)
+        style = config.get("style") if html_mode else None
 
         if not rows:
             return rows
 
-        if body_template:
-            rendered = []
-            for row in rows:
-                safe_row = {k: str(v) for k, v in row.items() if not k.startswith("_")}
+        rendered = []
+        for row in rows:
+            safe_row = {k: str(v) for k, v in row.items() if not k.startswith("_")}
+            if body_template:
                 try:
-                    rendered.append(body_template.format(**safe_row))
+                    content = body_template.format(**safe_row)
                 except KeyError:
-                    rendered.append(body_template)
-            if html_mode:
-                # Join rows with an HTML divider
-                body = "<hr>".join(rendered)
+                    content = body_template
             else:
-                body = "\n\n---\n\n".join(rendered)
+                if html_mode:
+                    content = "<br>".join(f"<b>{k}:</b> {v}" for k, v in safe_row.items())
+                else:
+                    content = " | ".join(f"{k}: {v}" for k, v in safe_row.items())
+            rendered.append(content)
+
+        if html_mode and style:
+            divider = '<hr style="border:none;border-top:1px solid #eeeeee;margin:20px 0;">'
+            rows_html = divider.join(r.replace("\n", "<br>") for r in rendered)
+            body = self._build_styled_email(
+                rows_html,
+                accent=style.get("accent_color", "#007acc"),
+                bg=style.get("bg_color", "#f0f4f8"),
+                text=style.get("text_color", "#333333"),
+                header=style.get("header_text", ""),
+                footer=style.get("footer_text", ""),
+            )
+        elif html_mode:
+            body = '<hr style="border:none;border-top:1px solid #eee;margin:16px 0;">'.join(
+                r.replace("\n", "<br>") for r in rendered
+            )
         else:
-            if html_mode:
-                rows_html = "".join(
-                    "<p>" + " &nbsp;|&nbsp; ".join(f"<b>{k}</b>: {v}" for k, v in row.items() if not k.startswith("_")) + "</p>"
-                    for row in rows
-                )
-                body = rows_html
-            else:
-                body = "\n".join(
-                    " | ".join(f"{k}: {v}" for k, v in row.items() if not k.startswith("_"))
-                    for row in rows
-                )
+            body = "\n\n---\n\n".join(rendered)
 
         content_type = "text/html" if html_mode else "text/plain"
         payload = json.dumps({
@@ -356,6 +364,36 @@ class ExecutionService:
             raise ValueError(f"SendGrid email returned unexpected status {status}")
 
         return rows
+
+    @staticmethod
+    def _build_styled_email(rows_html: str, accent: str, bg: str, text: str, header: str, footer: str) -> str:
+        """Build a fully styled HTML email with inline CSS."""
+        header_block = (
+            '<tr><td style="background:' + accent + ';padding:24px 32px;border-radius:8px 8px 0 0;">'
+            '<p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;letter-spacing:-0.3px;">' + header + '</p>'
+            '</td></tr>'
+        ) if header else ""
+        footer_block = (
+            '<tr><td style="padding:16px 32px;background:#f9f9f9;color:#888888;'
+            'font-size:12px;border-top:1px solid #eeeeee;border-radius:0 0 8px 8px;">'
+            + footer + '</td></tr>'
+        ) if footer else ""
+        return (
+            '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+            '<meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+            '<body style="margin:0;padding:0;background:' + bg + ';'
+            'font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Arial,sans-serif;">'
+            '<table width="100%" cellpadding="0" cellspacing="0">'
+            '<tr><td align="center" style="padding:40px 16px;">'
+            '<table width="560" cellpadding="0" cellspacing="0" '
+            'style="background:#ffffff;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">'
+            + header_block +
+            '<tr><td style="padding:32px;color:' + text + ';font-size:14px;line-height:1.7;">'
+            + rows_html +
+            '</td></tr>'
+            + footer_block +
+            '</table></td></tr></table></body></html>'
+        )
 
     @staticmethod
     def _apply_op(cell_value: Any, op: str, target: Any) -> bool:

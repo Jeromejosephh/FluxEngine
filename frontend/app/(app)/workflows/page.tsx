@@ -89,6 +89,11 @@ export default function WorkflowsPage() {
   const [stepEmailTo, setStepEmailTo] = useState("");
   const [stepEmailSubject, setStepEmailSubject] = useState("");
   const [stepHtmlMode, setStepHtmlMode] = useState(false);
+  const [emailAccentColor, setEmailAccentColor] = useState("#007acc");
+  const [emailBgColor, setEmailBgColor] = useState("#f0f4f8");
+  const [emailTextColor, setEmailTextColor] = useState("#333333");
+  const [emailHeaderText, setEmailHeaderText] = useState("");
+  const [emailFooterText, setEmailFooterText] = useState("Sent by FluxEngine");
   const [showAddStep, setShowAddStep] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -164,7 +169,17 @@ export default function WorkflowsPage() {
       if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
       if (stepType === "action") config = { webhook_url: stepWebhook };
       if (stepType === "notify") { config = { subtype: "notify", webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate }; dbStepType = "action"; }
-      if (stepType === "email") { config = { subtype: "email", to: stepEmailTo, subject: stepEmailSubject, body_template: stepBodyTemplate, html_body: stepHtmlMode }; dbStepType = "action"; }
+      if (stepType === "email") {
+        config = {
+          subtype: "email", to: stepEmailTo, subject: stepEmailSubject,
+          body_template: stepBodyTemplate, html_body: stepHtmlMode,
+          ...(stepHtmlMode && { style: {
+            accent_color: emailAccentColor, bg_color: emailBgColor, text_color: emailTextColor,
+            header_text: emailHeaderText, footer_text: emailFooterText,
+          }}),
+        };
+        dbStepType = "action";
+      }
       if (stepType === "transform") config = { select_columns: [] };
       return api.post(`/api/workflows/${selected!.id}/steps/`, {
         name: stepName, step_type: dbStepType,
@@ -176,7 +191,9 @@ export default function WorkflowsPage() {
       setShowAddStep(false); setStepName(""); setStepType("query");
       setStepTableId(""); setStepColumn(""); setStepOp("eq");
       setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate("");
-      setStepEmailTo(""); setStepEmailSubject(""); setStepHtmlMode(false); setStepError("");
+      setStepEmailTo(""); setStepEmailSubject(""); setStepHtmlMode(false);
+      setEmailAccentColor("#007acc"); setEmailBgColor("#f0f4f8"); setEmailTextColor("#333333");
+      setEmailHeaderText(""); setEmailFooterText("Sent by FluxEngine"); setStepError("");
       setPendingTest(true);
       showToast("Step added");
     },
@@ -239,6 +256,19 @@ export default function WorkflowsPage() {
     const dayStr = dow === "*" ? "every day" : dow.split(",").map((d) => dayNames[parseInt(d)] ?? d).join(", ");
     const tzLabel = tz.split("/").pop()?.replace(/_/g, " ") ?? tz;
     return `${h12}${minStr} ${ampm} - ${dayStr} - ${tzLabel}`;
+  }
+
+  function buildEmailPreview(body: string, accent: string, bg: string, text: string, header: string, footer: string): string {
+    const headerBlock = header
+      ? `<tr><td style="background:${accent};padding:18px 24px;border-radius:6px 6px 0 0;"><p style="margin:0;color:#ffffff;font-size:15px;font-weight:600;">${header}</p></td></tr>`
+      : "";
+    const footerBlock = footer
+      ? `<tr><td style="padding:12px 24px;background:#f9f9f9;color:#888888;font-size:11px;border-top:1px solid #eeeeee;border-radius:0 0 6px 6px;">${footer}</td></tr>`
+      : "";
+    const bodyHtml = body
+      ? body.replace(/\{(\w+)\}/g, (_, k) => `<span style="background:#e8f4fd;color:${accent};padding:1px 4px;border-radius:3px;font-size:11px;">{${k}}</span>`).replace(/\n/g, "<br>")
+      : `<span style="color:#aaaaaa;">Your message will appear here…</span>`;
+    return `<html><body style="margin:0;padding:16px;background:${bg};font-family:-apple-system,Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">${headerBlock}<tr><td style="padding:24px;color:${text};font-size:13px;line-height:1.6;">${bodyHtml}</td></tr>${footerBlock}</table></td></tr></table></body></html>`;
   }
 
   function openScheduleModal() {
@@ -701,15 +731,15 @@ export default function WorkflowsPage() {
                     <input placeholder="e.g. Follow-up Reminder" value={stepEmailSubject} onChange={(e) => setStepEmailSubject(e.target.value)} className={inputCls} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between">
                       <label className="text-xs text-[#858585] uppercase tracking-wide">Body</label>
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input type="checkbox" checked={stepHtmlMode} onChange={(e) => setStepHtmlMode(e.target.checked)} className="accent-[#007acc]" />
-                        <span className="text-xs text-[#858585]">HTML mode</span>
+                        <span className="text-xs text-[#858585]">Styled email</span>
                       </label>
                     </div>
                     {availableColumns.length > 0 && (
-                      <div className="flex gap-1 flex-wrap mb-1">
+                      <div className="flex gap-1 flex-wrap mt-1">
                         {availableColumns.map((col) => (
                           <button key={col} type="button"
                             onClick={() => setStepBodyTemplate((prev) => prev + `{${col}}`)}
@@ -720,20 +750,72 @@ export default function WorkflowsPage() {
                       </div>
                     )}
                     <textarea
-                      rows={stepHtmlMode ? 8 : 4}
-                      placeholder={stepHtmlMode
-                        ? "<p>Hi,</p>\n<p>You have a follow-up with <b>{company}</b> due on {follow_up_date}.</p>"
-                        : "Hi,\n\nYou have a follow-up with {company} due on {follow_up_date}.\n\nRole: {role}"}
+                      rows={4}
+                      placeholder={"Hi,\n\nYou have a follow-up with {company} due on {follow_up_date}.\n\nRole: {role}"}
                       value={stepBodyTemplate}
                       onChange={(e) => setStepBodyTemplate(e.target.value)}
-                      className={`${inputCls} resize-y font-mono text-xs`}
+                      className={`${inputCls} resize-y text-xs mt-1`}
                     />
-                    <p className="text-xs text-[#4e4e4e]">
-                      {stepHtmlMode
-                        ? "HTML email - use <b>, <br>, <table>, etc. Use {column} to insert row values."
-                        : "Plain text email. Use {column} to insert values. Each row sends one line."}
-                    </p>
+                    <p className="text-xs text-[#4e4e4e]">Use {"{column}"} to insert values. Each matching row is sent as a section.</p>
                   </div>
+
+                  {/* Design panel */}
+                  {stepHtmlMode && (
+                    <div className="border border-[#3e3e42] rounded-lg p-3 flex flex-col gap-3 bg-[#1e1e1e]">
+                      <p className="text-xs font-medium text-[#d4d4d4]">Design</p>
+
+                      {/* Colors */}
+                      <div className="flex gap-3">
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-xs text-[#858585]">Accent</label>
+                          <div className="flex gap-1.5 items-center">
+                            <input type="color" value={emailAccentColor} onChange={(e) => setEmailAccentColor(e.target.value)}
+                              className="w-8 h-8 rounded cursor-pointer border border-[#3e3e42] bg-transparent p-0.5" />
+                            <span className="text-xs text-[#858585] font-mono">{emailAccentColor}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-xs text-[#858585]">Background</label>
+                          <div className="flex gap-1.5 items-center">
+                            <input type="color" value={emailBgColor} onChange={(e) => setEmailBgColor(e.target.value)}
+                              className="w-8 h-8 rounded cursor-pointer border border-[#3e3e42] bg-transparent p-0.5" />
+                            <span className="text-xs text-[#858585] font-mono">{emailBgColor}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-xs text-[#858585]">Text</label>
+                          <div className="flex gap-1.5 items-center">
+                            <input type="color" value={emailTextColor} onChange={(e) => setEmailTextColor(e.target.value)}
+                              className="w-8 h-8 rounded cursor-pointer border border-[#3e3e42] bg-transparent p-0.5" />
+                            <span className="text-xs text-[#858585] font-mono">{emailTextColor}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Header / Footer text */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs text-[#858585]">Header title</label>
+                        <input placeholder="e.g. Daily Follow-up Reminder" value={emailHeaderText}
+                          onChange={(e) => setEmailHeaderText(e.target.value)} className={inputCls} />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-xs text-[#858585]">Footer text</label>
+                        <input placeholder="e.g. Sent by FluxEngine" value={emailFooterText}
+                          onChange={(e) => setEmailFooterText(e.target.value)} className={inputCls} />
+                      </div>
+
+                      {/* Live preview */}
+                      <div>
+                        <p className="text-xs text-[#858585] mb-1.5">Preview</p>
+                        <iframe
+                          srcDoc={buildEmailPreview(stepBodyTemplate, emailAccentColor, emailBgColor, emailTextColor, emailHeaderText, emailFooterText)}
+                          className="w-full rounded border border-[#3e3e42]"
+                          style={{ height: 240 }}
+                          sandbox="allow-same-origin"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
