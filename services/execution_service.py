@@ -84,8 +84,15 @@ class ExecutionService:
                     output = self._run_notify_step(config, context_rows)
                 else:
                     output = self._run_action_step(config, context_rows)
+            elif step.step_type == "condition":
+                col = config.get("column")
+                op = config.get("op", "eq")
+                val = config.get("value")
+                if col is not None and val is not None:
+                    output = [r for r in context_rows if self._apply_op(r.get(col), op, val)]
+                else:
+                    output = context_rows
             else:
-                # condition - not yet implemented, pass through
                 output = context_rows
 
             return StepResult(

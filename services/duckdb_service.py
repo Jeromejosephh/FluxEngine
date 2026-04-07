@@ -1,4 +1,5 @@
 """DuckDB database service"""
+import json
 import duckdb
 from typing import List, Dict, Any, Optional
 from pathlib import Path
