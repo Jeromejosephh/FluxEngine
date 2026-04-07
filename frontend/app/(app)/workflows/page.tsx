@@ -15,6 +15,7 @@ interface Step {
   config: Record<string, unknown>; order: number; workflow_id: number;
 }
 interface Table { id: number; name: string; }
+interface TableSchema { id: number; name: string; schema_definition: { columns: { name: string; type: string }[] }; }
 interface Schedule { cron_expr: string; is_enabled: boolean; timezone: string; next_run_at: string | null; }
 interface StepResult { step_id: number; step_name: string; step_type: string; success: boolean; rows_out: number; error?: string; }
 interface RunResult { success: boolean; workflow_name: string; error?: string; steps: StepResult[]; }
@@ -87,6 +88,7 @@ export default function WorkflowsPage() {
   const [stepBodyTemplate, setStepBodyTemplate] = useState("");
   const [stepEmailTo, setStepEmailTo] = useState("");
   const [stepEmailSubject, setStepEmailSubject] = useState("");
+  const [stepHtmlMode, setStepHtmlMode] = useState(false);
   const [showAddStep, setShowAddStep] = useState(false);
   const [stepError, setStepError] = useState("");
 
@@ -105,6 +107,16 @@ export default function WorkflowsPage() {
     queryKey: ["tables"],
     queryFn: () => api.get("/api/tables/"),
   });
+
+  // For column hints in email/notify step: find the query step's table
+  const queryStep = steps.find((s) => s.step_type === "query");
+  const queryTableId = queryStep ? (queryStep.config as Record<string, unknown>).table_id as number : null;
+  const { data: queryTable } = useQuery<TableSchema>({
+    queryKey: ["table-schema", queryTableId],
+    queryFn: () => api.get(`/api/tables/${queryTableId}`),
+    enabled: !!queryTableId,
+  });
+  const availableColumns = queryTable?.schema_definition?.columns?.map((c) => c.name) ?? [];
 
   const { data: schedule } = useQuery<Schedule>({
     queryKey: ["schedule", selected?.id],
@@ -152,7 +164,7 @@ export default function WorkflowsPage() {
       if (stepType === "condition") config = { column: stepColumn, op: stepOp, value: stepValue };
       if (stepType === "action") config = { webhook_url: stepWebhook };
       if (stepType === "notify") { config = { subtype: "notify", webhook_url: stepWebhook, title: stepTitle, body_template: stepBodyTemplate }; dbStepType = "action"; }
-      if (stepType === "email") { config = { subtype: "email", to: stepEmailTo, subject: stepEmailSubject, body_template: stepBodyTemplate }; dbStepType = "action"; }
+      if (stepType === "email") { config = { subtype: "email", to: stepEmailTo, subject: stepEmailSubject, body_template: stepBodyTemplate, html_body: stepHtmlMode }; dbStepType = "action"; }
       if (stepType === "transform") config = { select_columns: [] };
       return api.post(`/api/workflows/${selected!.id}/steps/`, {
         name: stepName, step_type: dbStepType,
@@ -164,7 +176,7 @@ export default function WorkflowsPage() {
       setShowAddStep(false); setStepName(""); setStepType("query");
       setStepTableId(""); setStepColumn(""); setStepOp("eq");
       setStepValue(""); setStepWebhook(""); setStepTitle(""); setStepBodyTemplate("");
-      setStepEmailTo(""); setStepEmailSubject(""); setStepError("");
+      setStepEmailTo(""); setStepEmailSubject(""); setStepHtmlMode(false); setStepError("");
       setPendingTest(true);
       showToast("Step added");
     },
@@ -689,14 +701,38 @@ export default function WorkflowsPage() {
                     <input placeholder="e.g. Follow-up Reminder" value={stepEmailSubject} onChange={(e) => setStepEmailSubject(e.target.value)} className={inputCls} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs text-[#858585] uppercase tracking-wide">Message template</label>
-                    <input
-                      placeholder="e.g. {company} | {role} | Due: {follow_up_date}"
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs text-[#858585] uppercase tracking-wide">Body</label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={stepHtmlMode} onChange={(e) => setStepHtmlMode(e.target.checked)} className="accent-[#007acc]" />
+                        <span className="text-xs text-[#858585]">HTML mode</span>
+                      </label>
+                    </div>
+                    {availableColumns.length > 0 && (
+                      <div className="flex gap-1 flex-wrap mb-1">
+                        {availableColumns.map((col) => (
+                          <button key={col} type="button"
+                            onClick={() => setStepBodyTemplate((prev) => prev + `{${col}}`)}
+                            className="text-xs bg-[#37373d] text-[#4ec9b0] px-2 py-0.5 rounded hover:bg-[#3e3e42] font-mono">
+                            +{"{" + col + "}"}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <textarea
+                      rows={stepHtmlMode ? 8 : 4}
+                      placeholder={stepHtmlMode
+                        ? "<p>Hi,</p>\n<p>You have a follow-up with <b>{company}</b> due on {follow_up_date}.</p>"
+                        : "Hi,\n\nYou have a follow-up with {company} due on {follow_up_date}.\n\nRole: {role}"}
                       value={stepBodyTemplate}
                       onChange={(e) => setStepBodyTemplate(e.target.value)}
-                      className={inputCls}
+                      className={`${inputCls} resize-y font-mono text-xs`}
                     />
-                    <p className="text-xs text-[#4e4e4e]">Use {"{"} column_name {"}"} to insert values from each row</p>
+                    <p className="text-xs text-[#4e4e4e]">
+                      {stepHtmlMode
+                        ? "HTML email - use <b>, <br>, <table>, etc. Use {column} to insert row values."
+                        : "Plain text email. Use {column} to insert values. Each row sends one line."}
+                    </p>
                   </div>
                 </div>
               )}

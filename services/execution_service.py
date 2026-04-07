@@ -297,30 +297,43 @@ class ExecutionService:
         to = config["to"]
         subject = config.get("subject", "FluxEngine Notification")
         body_template = config.get("body_template", "")
+        html_mode = config.get("html_body", False)
 
         if not rows:
             return rows
 
         if body_template:
-            lines = []
+            rendered = []
             for row in rows:
                 safe_row = {k: str(v) for k, v in row.items() if not k.startswith("_")}
                 try:
-                    lines.append(body_template.format(**safe_row))
+                    rendered.append(body_template.format(**safe_row))
                 except KeyError:
-                    lines.append(str(safe_row))
-            body = "\n".join(lines)
+                    rendered.append(body_template)
+            if html_mode:
+                # Join rows with an HTML divider
+                body = "<hr>".join(rendered)
+            else:
+                body = "\n\n---\n\n".join(rendered)
         else:
-            body = "\n".join(
-                " | ".join(f"{k}: {v}" for k, v in row.items() if not k.startswith("_"))
-                for row in rows
-            )
+            if html_mode:
+                rows_html = "".join(
+                    "<p>" + " &nbsp;|&nbsp; ".join(f"<b>{k}</b>: {v}" for k, v in row.items() if not k.startswith("_")) + "</p>"
+                    for row in rows
+                )
+                body = rows_html
+            else:
+                body = "\n".join(
+                    " | ".join(f"{k}: {v}" for k, v in row.items() if not k.startswith("_"))
+                    for row in rows
+                )
 
+        content_type = "text/html" if html_mode else "text/plain"
         payload = json.dumps({
             "personalizations": [{"to": [{"email": to}]}],
             "from": {"email": settings.SENDGRID_FROM_EMAIL},
             "subject": subject,
-            "content": [{"type": "text/plain", "value": body}]
+            "content": [{"type": content_type, "value": body}]
         }).encode("utf-8")
 
         req = urllib.request.Request(
