@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/src/providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const geist = Geist({ subsets: ["latin"] });
 
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="h-full dark">
       <body className={`${geist.className} h-full bg-[#1e1e1e] text-[#d4d4d4]`}>
         <Providers>{children}</Providers>
+        <Analytics />
       </body>
     </html>
   );
