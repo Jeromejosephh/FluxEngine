@@ -121,7 +121,7 @@ export default function WorkflowsPage() {
 
   const { data: schedule } = useQuery<Schedule>({
     queryKey: ["schedule", selected?.id],
-    queryFn: () => api.get(`/api/workflows/${selected!.id}/schedule/`),
+    queryFn: () => api.get(`/api/workflows/${selected!.id}/schedule`),
     enabled: !!selected,
     retry: false,
   });
@@ -353,7 +353,7 @@ export default function WorkflowsPage() {
 
   const saveSchedule = useMutation({
     mutationFn: () =>
-      api.post(`/api/workflows/${selected!.id}/schedule/`, {
+      api.post(`/api/workflows/${selected!.id}/schedule`, {
         cron_expr: buildCron(),
         is_enabled: scheduleEnabled,
         timezone: schedTimezone,
@@ -605,7 +605,6 @@ export default function WorkflowsPage() {
                 <div className="flex gap-1.5 flex-wrap">
                   {["Every day", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, i) => {
                     const isEvery = label === "Every day";
-                    const dayNum = i; // 0=Every day offset, 1=Mon(1), 2=Tue(2) ... 7=Sun(0)
                     const cronDay = i === 7 ? 0 : i; // Sun=0
                     const isActive = isEvery
                       ? schedDays === "everyday"
