@@ -502,17 +502,19 @@ async def update_schedule(
 
     new_cron = data.cron_expr if data.cron_expr is not None else existing.cron_expr
     new_enabled = data.is_enabled if data.is_enabled is not None else existing.is_enabled
-    next_run = _compute_next_run(new_cron) if new_enabled else None
+    new_tz = data.timezone if data.timezone is not None else existing.timezone
+    next_run = _compute_next_run(new_cron, new_tz) if new_enabled else None
 
     schedule = db.update_schedule(
         workflow_id,
         cron_expr=new_cron,
         is_enabled=new_enabled,
         next_run_at=next_run,
+        timezone=new_tz,
     )
 
     if new_enabled:
-        add_or_replace_job(workflow_id, new_cron, user.id)
+        add_or_replace_job(workflow_id, new_cron, user.id, new_tz)
     else:
         remove_job(workflow_id)
 
