@@ -6,6 +6,8 @@ from schemas.user import UserCreate, UserResponse, UserLogin
 from schemas.auth import Token
 from services.auth_service import AuthService
 from services.audit_service import AuditService
+from services.workflow_service import WorkflowService
+from services.table_service import TableService
 from utils.exceptions import AuthenticationException
 from utils.limiter import limiter
 
@@ -68,6 +70,33 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
             detail=e.detail,
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+@router.delete("/reset", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_account(token: str = Depends(oauth2_scheme)):
+    """Delete all workflows and tables belonging to the current user."""
+    auth_service = AuthService()
+    try:
+        user = auth_service.get_current_user(token)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    workflow_service = WorkflowService()
+    table_service = TableService()
+
+    for wf in workflow_service.get_all_workflows(user_id=user.id):
+        try:
+            workflow_service.delete_workflow(wf.id, user_id=user.id)
+        except Exception:
+            pass
+
+    for tbl in table_service.get_all_tables(user_id=user.id):
+        try:
+            table_service.delete_table(tbl.id, user_id=user.id)
+        except Exception:
+            pass
+
+    return None
 
 
 @router.get("/me", response_model=UserResponse)
