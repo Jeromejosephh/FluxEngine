@@ -22,6 +22,7 @@ async def register(request: Request, user_data: UserCreate):
     auth_service = AuthService()
     audit_service = AuditService()
 
+    user_data.role = "editor"
     try:
         user = auth_service.create_user(user_data)
         audit_service.log_action(

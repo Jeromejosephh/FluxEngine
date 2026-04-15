@@ -107,7 +107,7 @@ class AuthService:
             email=user_data.email,
             hashed_password=hashed_password,
             full_name=user_data.full_name,
-            role="editor"
+            role=user_data.role
         )
 
         return user
