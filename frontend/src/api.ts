@@ -47,7 +47,7 @@ export async function login(email: string, password: string): Promise<{ access_t
 }
 
 export async function register(email: string, password: string, full_name: string) {
-  return api.post("/api/auth/register", { email, password, full_name, role: "admin" });
+  return api.post("/api/auth/register", { email, password, full_name });
 }
 
 export async function getMe() {
