@@ -6,8 +6,7 @@ from schemas.user import UserCreate, UserResponse, UserLogin
 from schemas.auth import Token
 from services.auth_service import AuthService
 from services.audit_service import AuditService
-from services.workflow_service import WorkflowService
-from services.table_service import TableService
+from services.duckdb_service import DuckDBService
 from utils.exceptions import AuthenticationException
 from utils.limiter import limiter
 
@@ -82,20 +81,36 @@ async def reset_account(token: str = Depends(oauth2_scheme)):
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
-    workflow_service = WorkflowService()
-    table_service = TableService()
+    db = DuckDBService()
 
-    for wf in workflow_service.get_all_workflows(user_id=user.id):
+    # Collect table IDs before deleting so we can drop their data_ tables
+    table_rows = db.execute(
+        "SELECT id FROM tables WHERE created_by = ?", (user.id,)
+    )
+
+    # Delete dependent rows first (FK order)
+    db.execute(
+        "DELETE FROM steps WHERE workflow_id IN (SELECT id FROM workflows WHERE created_by = ?)",
+        (user.id,),
+    )
+    db.execute(
+        "DELETE FROM executions WHERE workflow_id IN (SELECT id FROM workflows WHERE created_by = ?)",
+        (user.id,),
+    )
+    db.execute(
+        "DELETE FROM schedules WHERE workflow_id IN (SELECT id FROM workflows WHERE created_by = ?)",
+        (user.id,),
+    )
+    db.execute("DELETE FROM inbound_webhooks WHERE created_by = ?", (user.id,))
+    db.execute("DELETE FROM workflows WHERE created_by = ?", (user.id,))
+
+    # Drop the actual data tables and remove their metadata rows
+    for row in table_rows:
         try:
-            workflow_service.delete_workflow(wf.id, user_id=user.id)
+            db.execute(f"DROP TABLE IF EXISTS data_{row['id']}")
         except Exception:
             pass
-
-    for tbl in table_service.get_all_tables(user_id=user.id):
-        try:
-            table_service.delete_table(tbl.id, user_id=user.id)
-        except Exception:
-            pass
+    db.execute("DELETE FROM tables WHERE created_by = ?", (user.id,))
 
     return None
 
