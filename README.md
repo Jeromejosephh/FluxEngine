@@ -42,12 +42,14 @@ Many automation tools rely on heavy orchestration platforms. FluxEngine provides
 
 ## 📸 Screenshots
 
+<p>
 <img src="screenshot/fluxengine1.png" alt="Home" width="260" />
 <img src="screenshot/fluxengine2.png" alt="Home" width="260" />
 <img src="screenshot/fluxengine3.png" alt="Home" width="260" />
 <img src="screenshot/fluxengine4.png" alt="Home" width="260" />
 <img src="screenshot/fluxengine5.png" alt="Home" width="260" />
 <img src="screenshot/fluxengine6.png" alt="Home" width="260" />
+</p>
 
 ---
 
