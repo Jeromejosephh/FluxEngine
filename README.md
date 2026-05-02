@@ -4,7 +4,7 @@ A backend workflow automation engine for defining and executing multi-step data 
 
 **Tech:** FastAPI, DuckDB, JWT, APScheduler, Next.js  
 **Live:** https://flux-engine.vercel.app  
-**API Docs:** http://localhost:8000/docs  
+**API Docs:** Run locally and visit http://localhost:8000/docs for interactive documentation
 
 ---
 
@@ -102,7 +102,7 @@ API available at:
 http://localhost:8000
 
 Interactive docs:
-http://localhost:8000/docs
+http://localhost:8000/docs (Swagger UI - explore all endpoints here)
 
 🧪 Running Tests
 
